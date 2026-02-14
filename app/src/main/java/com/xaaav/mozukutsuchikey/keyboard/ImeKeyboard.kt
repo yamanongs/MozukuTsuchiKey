@@ -399,6 +399,7 @@ private fun RenderGridKey(
                 cornerRadius = dims.cornerRadius,
                 backgroundColor = if (isSpace) SpaceBarBackground else CharKeyBackground,
                 showPreview = !isSpace,
+                repeatable = true,
             )
         }
 
@@ -420,6 +421,7 @@ private fun RenderGridKey(
             fontSize = dims.fontSize,
             cornerRadius = dims.cornerRadius,
             backgroundColor = RepeatKeyBackground,
+            showPreview = true,
         )
 
         is Key.Modifier -> {

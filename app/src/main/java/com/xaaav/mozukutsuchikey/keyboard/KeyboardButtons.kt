@@ -11,8 +11,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -32,15 +33,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -59,33 +57,42 @@ fun QwertyKeyButton(
     repeatable: Boolean = false,
 ) {
     if (repeatable) {
-        // Delegate to repeatable implementation
-        QwertyRepeatableButton(
-            label = label ?: "",
-            icon = icon,
-            onPress = onClick,
-            modifier = modifier,
-            fontSize = fontSize,
-            cornerRadius = cornerRadius,
-            backgroundColor = backgroundColor,
-        )
-        return
-    }
+        val currentOnClick by rememberUpdatedState(onClick)
+        val coroutineScope = rememberCoroutineScope()
+        var isPressed by remember { mutableStateOf(false) }
+        var repeatJob by remember { mutableStateOf<Job?>(null) }
 
-    val interactionSource = remember { MutableInteractionSource() }
-    val isPressed by interactionSource.collectIsPressedAsState()
-    val bgColor = if (isPressed) pressedBackgroundColor else backgroundColor
-    var buttonSize by remember { mutableStateOf(IntSize.Zero) }
+        DisposableEffect(Unit) { onDispose { repeatJob?.cancel() } }
 
-    Box(modifier = modifier.onGloballyPositioned { buttonSize = it.size }) {
+        val bgColor = if (isPressed) pressedBackgroundColor else backgroundColor
+
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    onClick = onClick,
-                ),
+            modifier = modifier
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = {
+                            isPressed = true
+                            repeatJob = coroutineScope.launch {
+                                delay(500)
+                                if (!isPressed) return@launch
+                                currentOnClick()
+                                delay(100)
+                                while (isPressed) {
+                                    currentOnClick()
+                                    delay(50)
+                                }
+                            }
+                            val released = tryAwaitRelease()
+                            isPressed = false
+                            if (released && repeatJob?.isActive == true) {
+                                repeatJob?.cancel()
+                                currentOnClick()
+                            } else {
+                                repeatJob?.cancel()
+                            }
+                        }
+                    )
+                },
             shape = RoundedCornerShape(cornerRadius),
             color = bgColor,
             shadowElevation = if (isPressed) 0.dp else 1.dp,
@@ -94,6 +101,9 @@ fun QwertyKeyButton(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.fillMaxSize(),
             ) {
+                if (isPressed && showPreview && label != null && label.isNotEmpty()) {
+                    KeyPreviewPopup(label = label, fontSize = fontSize, cornerRadius = cornerRadius, backgroundColor = backgroundColor)
+                }
                 if (label != null && label.isNotEmpty()) {
                     Text(
                         text = label,
@@ -111,15 +121,44 @@ fun QwertyKeyButton(
                 }
             }
         }
+    } else {
+        val interactionSource = remember { MutableInteractionSource() }
+        val isPressed by interactionSource.collectIsPressedAsState()
+        val bgColor = if (isPressed) pressedBackgroundColor else backgroundColor
 
-        // Key preview popup
-        if (isPressed && showPreview && label != null && label.isNotEmpty() && buttonSize != IntSize.Zero) {
-            KeyPreviewPopup(
-                label = label,
-                fontSize = fontSize,
-                cornerRadius = cornerRadius,
-                buttonSize = buttonSize,
-            )
+        Surface(
+            modifier = modifier.clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = onClick,
+            ),
+            shape = RoundedCornerShape(cornerRadius),
+            color = bgColor,
+            shadowElevation = if (isPressed) 0.dp else 1.dp,
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                if (isPressed && showPreview && label != null && label.isNotEmpty()) {
+                    KeyPreviewPopup(label = label, fontSize = fontSize, cornerRadius = cornerRadius, backgroundColor = backgroundColor)
+                }
+                if (label != null && label.isNotEmpty()) {
+                    Text(
+                        text = label,
+                        color = KeyTextColor,
+                        fontSize = fontSize.sp,
+                        maxLines = 1,
+                    )
+                } else if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = KeyTextColor,
+                        modifier = Modifier.size((fontSize + 4).dp),
+                    )
+                }
+            }
         }
     }
 }
@@ -129,34 +168,29 @@ fun KeyPreviewPopup(
     label: String,
     fontSize: Int,
     cornerRadius: Dp,
-    buttonSize: IntSize,
+    backgroundColor: Color = CharKeyBackground,
 ) {
     val density = LocalDensity.current
-    val previewWidth = with(density) { (buttonSize.width / density.density * 1.5f).dp }
-    val previewHeight = with(density) { (buttonSize.height / density.density * 1.8f).dp }
-    val offsetX = with(density) { ((buttonSize.width - previewWidth.toPx()) / 2).toInt() }
-    val offsetY = with(density) { (-previewHeight.toPx()).toInt() }
-
+    val offsetY = with(density) { -55.dp.roundToPx() }
     Popup(
-        alignment = Alignment.TopStart,
-        offset = IntOffset(offsetX, offsetY),
-        properties = PopupProperties(clippingEnabled = false),
+        alignment = Alignment.TopCenter,
+        offset = IntOffset(0, offsetY),
     ) {
         Surface(
-            modifier = Modifier.size(previewWidth, previewHeight),
-            shape = RoundedCornerShape(cornerRadius * 1.5f),
-            color = CharKeyBackground,
+            shape = RoundedCornerShape(cornerRadius + 2.dp),
+            color = backgroundColor,
             shadowElevation = 4.dp,
         ) {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 Text(
                     text = label,
                     color = KeyTextColor,
-                    fontSize = (fontSize * 1.8).sp,
-                    maxLines = 1,
+                    fontSize = (fontSize * 1.6).sp,
                 )
             }
         }
@@ -172,6 +206,7 @@ fun QwertyRepeatableButton(
     fontSize: Int,
     cornerRadius: Dp,
     backgroundColor: Color = CharKeyBackground,
+    showPreview: Boolean = false,
 ) {
     val currentOnPress by rememberUpdatedState(onPress)
     val coroutineScope = rememberCoroutineScope()
@@ -217,6 +252,9 @@ fun QwertyRepeatableButton(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize(),
         ) {
+            if (isPressed && showPreview) {
+                KeyPreviewPopup(label = label, fontSize = fontSize, cornerRadius = cornerRadius, backgroundColor = backgroundColor)
+            }
             if (icon != null) {
                 Icon(
                     imageVector = icon,
