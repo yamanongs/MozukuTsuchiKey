@@ -3,7 +3,13 @@ package com.xaaav.mozukutsuchikey.keyboard
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class Key {
-    class Char(val normal: kotlin.Char, val shifted: kotlin.Char) : Key()
+    class Char(
+        val normal: kotlin.Char,
+        val shifted: kotlin.Char,
+        val symbol: kotlin.Char? = null,
+        val symbolLabel: String? = null,
+        val symbolKeyCode: Int? = null,
+    ) : Key()
     class Action(val label: String, val keyCode: Int) : Key()
     class Repeatable(
         val label: String,

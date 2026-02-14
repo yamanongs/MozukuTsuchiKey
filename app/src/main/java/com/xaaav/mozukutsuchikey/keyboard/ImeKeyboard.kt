@@ -9,18 +9,19 @@ import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.inputmethod.InputConnection
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -54,6 +55,7 @@ fun ImeKeyboard(
     val context = LocalContext.current
 
     var isJapaneseMode by remember { mutableStateOf(false) }
+    var symbolMode by remember { mutableStateOf(false) }
     var isListening by remember { mutableStateOf(false) }
     var isSpeaking by remember { mutableStateOf(false) }
     val voiceScope = rememberCoroutineScope()
@@ -189,11 +191,25 @@ fun ImeKeyboard(
     fun handleKeyPress(key: Key) {
         when (key) {
             is Key.Char -> {
+                if (symbolMode) {
+                    // Symbol mode: send symbolKeyCode or commit symbol char
+                    if (key.symbolKeyCode != null) {
+                        sendKeyEvent(key.symbolKeyCode, buildMetaState())
+                    } else if (key.symbol != null) {
+                        currentInputConnection()?.commitText(key.symbol.toString(), 1)
+                    } else {
+                        // No symbol defined, fall through to normal
+                        val ch = if (isShiftActive) key.shifted else key.normal
+                        currentInputConnection()?.commitText(ch.toString(), 1)
+                    }
+                    clearTransientModifiers()
+                    return
+                }
+
                 val ch = if (isShiftActive) key.shifted else key.normal
                 val ic = currentInputConnection()
                 when {
                     isCtrlActive || isAltActive -> {
-                        // Ctrl/Alt combos via sendKeyEvent
                         val androidKeyCode = when {
                             ch in 'a'..'z' -> AndroidKeyEvent.KEYCODE_A + (ch - 'a')
                             ch in 'A'..'Z' -> AndroidKeyEvent.KEYCODE_A + (ch - 'A')
@@ -224,7 +240,6 @@ fun ImeKeyboard(
                 } else {
                     val meta = buildMetaState()
                     if (key.keyCode == AndroidKeyEvent.KEYCODE_TAB && isShiftActive) {
-                        // Shift+Tab
                         sendKeyEvent(AndroidKeyEvent.KEYCODE_TAB,
                             AndroidKeyEvent.META_SHIFT_ON or AndroidKeyEvent.META_SHIFT_LEFT_ON)
                     } else {
@@ -243,14 +258,23 @@ fun ImeKeyboard(
                 clearTransientModifiers()
             }
 
-            is Key.Modifier -> toggleModifier(key.type)
+            is Key.Modifier -> {
+                if (symbolMode && key.type == ModifierType.SHIFT) return
+                toggleModifier(key.type)
+            }
 
             is Key.JpToggle -> {
+                if (symbolMode) return
                 isJapaneseMode = !isJapaneseMode
                 if (!isJapaneseMode) mozcController.reset()
             }
 
-            is Key.SymbolSwitch -> { /* TODO */ }
+            is Key.SymbolSwitch -> {
+                symbolMode = !symbolMode
+                if (symbolMode) {
+                    shiftState = ModifierLevel.OFF
+                }
+            }
 
             is Key.VoiceInput -> {
                 if (isListening) {
@@ -296,7 +320,7 @@ fun ImeKeyboard(
     }
 
     Surface(
-        modifier = modifier,
+        modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars),
         color = KeyboardBackground,
     ) {
         Column {
@@ -325,6 +349,7 @@ fun ImeKeyboard(
                     dims = dims,
                     isShiftActive = isShiftActive,
                     isJapaneseMode = isJapaneseMode,
+                    symbolMode = symbolMode,
                     ctrlState = ctrlState,
                     altState = altState,
                     shiftState = shiftState,
@@ -344,6 +369,7 @@ private fun RenderGridKey(
     dims: QwertyDimensions,
     isShiftActive: Boolean,
     isJapaneseMode: Boolean,
+    symbolMode: Boolean,
     ctrlState: ModifierLevel,
     altState: ModifierLevel,
     shiftState: ModifierLevel,
@@ -356,15 +382,22 @@ private fun RenderGridKey(
     val keyModifier = Modifier.fillMaxSize()
     when (key) {
         is Key.Char -> {
-            val displayChar = if (isShiftActive) key.shifted else key.normal
             val isSpace = key.normal == ' '
+            val displayLabel = when {
+                isSpace -> ""
+                symbolMode && key.symbolLabel != null -> key.symbolLabel
+                symbolMode && key.symbol != null -> key.symbol.toString()
+                isShiftActive -> key.shifted.toString()
+                else -> key.normal.toString()
+            }
             QwertyKeyButton(
-                label = if (isSpace) "" else displayChar.toString(),
+                label = displayLabel,
                 onClick = { onKeyPress(key) },
                 modifier = keyModifier,
                 fontSize = dims.fontSize,
                 cornerRadius = dims.cornerRadius,
                 backgroundColor = if (isSpace) SpaceBarBackground else CharKeyBackground,
+                showPreview = !isSpace,
             )
         }
 
@@ -375,6 +408,7 @@ private fun RenderGridKey(
             fontSize = dims.fontSize,
             cornerRadius = dims.cornerRadius,
             backgroundColor = ActionKeyBackground,
+            showPreview = false,
         )
 
         is Key.Repeatable -> QwertyRepeatableButton(
@@ -388,67 +422,88 @@ private fun RenderGridKey(
         )
 
         is Key.Modifier -> {
-            val level = when (key.type) {
-                ModifierType.CTRL -> ctrlState
-                ModifierType.ALT -> altState
-                ModifierType.SHIFT -> shiftState
+            if (symbolMode && key.type == ModifierType.SHIFT) {
+                // Disabled appearance in symbol mode
+                QwertyKeyButton(
+                    label = key.type.label,
+                    onClick = {},
+                    modifier = keyModifier,
+                    fontSize = dims.fontSize,
+                    cornerRadius = dims.cornerRadius,
+                    backgroundColor = ModifierOffBackground,
+                    showPreview = false,
+                )
+            } else {
+                val level = when (key.type) {
+                    ModifierType.CTRL -> ctrlState
+                    ModifierType.ALT -> altState
+                    ModifierType.SHIFT -> shiftState
+                }
+                QwertyModifierButton(
+                    label = key.type.label,
+                    level = level,
+                    onClick = { onToggleModifier(key.type) },
+                    modifier = keyModifier,
+                    fontSize = dims.fontSize,
+                    cornerRadius = dims.cornerRadius,
+                )
             }
-            QwertyModifierButton(
-                label = key.type.label,
-                level = level,
-                onClick = { onToggleModifier(key.type) },
-                modifier = keyModifier,
-                fontSize = dims.fontSize,
-                cornerRadius = dims.cornerRadius,
-            )
         }
 
-        is Key.JpToggle -> QwertyModifierButton(
-            label = if (isJapaneseMode) "JP" else "EN",
-            level = if (isJapaneseMode) ModifierLevel.LOCKED else ModifierLevel.OFF,
-            onClick = { onKeyPress(key) },
-            modifier = keyModifier,
-            fontSize = dims.fontSize,
-            cornerRadius = dims.cornerRadius,
-        )
+        is Key.JpToggle -> {
+            if (symbolMode) {
+                // Empty/disabled in symbol mode
+                QwertyKeyButton(
+                    label = "",
+                    onClick = {},
+                    modifier = keyModifier,
+                    fontSize = dims.fontSize,
+                    cornerRadius = dims.cornerRadius,
+                    backgroundColor = ActionKeyBackground,
+                    showPreview = false,
+                )
+            } else {
+                QwertyKeyButton(
+                    label = if (isJapaneseMode) "JP" else "EN",
+                    onClick = { onKeyPress(key) },
+                    modifier = keyModifier,
+                    fontSize = dims.fontSize,
+                    cornerRadius = dims.cornerRadius,
+                    backgroundColor = if (isJapaneseMode) JpModeBackground else EnModeBackground,
+                    pressedBackgroundColor = if (isJapaneseMode) JpModePressedBackground else EnModePressedBackground,
+                    showPreview = false,
+                )
+            }
+        }
 
         is Key.SymbolSwitch -> QwertyKeyButton(
-            label = "#+=",
+            label = if (symbolMode) "Abc" else "#+=",
+            icon = if (symbolMode) null else Icons.Default.Tag,
             onClick = { onKeyPress(key) },
             modifier = keyModifier,
             fontSize = dims.fontSize,
             cornerRadius = dims.cornerRadius,
-            backgroundColor = ActionKeyBackground,
+            backgroundColor = SymbolSwitchBackground,
+            pressedBackgroundColor = SymbolSwitchPressedBackground,
+            showPreview = false,
         )
 
         is Key.VoiceInput -> {
-            val voiceBg = if (isListening) {
-                if (isSpeaking) {
-                    val transition = rememberInfiniteTransition(label = "voicePulse")
-                    val alpha by transition.animateFloat(
-                        initialValue = 0.5f,
-                        targetValue = 1f,
-                        animationSpec = infiniteRepeatable(
-                            animation = tween(600),
-                            repeatMode = RepeatMode.Reverse,
-                        ),
-                        label = "voiceAlpha",
-                    )
-                    VoiceActiveBackground.copy(alpha = alpha)
-                } else {
-                    VoiceActiveBackground
+            val voiceBg = if (isListening) VoiceActiveBackground else ActionKeyBackground
+            Box(modifier = keyModifier) {
+                QwertyKeyButton(
+                    icon = if (isSpeaking) Icons.Default.GraphicEq else Icons.Default.Mic,
+                    onClick = { onKeyPress(key) },
+                    modifier = Modifier.fillMaxSize(),
+                    fontSize = dims.fontSize,
+                    cornerRadius = dims.cornerRadius,
+                    backgroundColor = voiceBg,
+                    showPreview = false,
+                )
+                if (isListening && isSpeaking) {
+                    VoicePulseRings(modifier = Modifier.fillMaxSize())
                 }
-            } else {
-                ActionKeyBackground
             }
-            QwertyKeyButton(
-                icon = Icons.Default.Mic,
-                onClick = { onKeyPress(key) },
-                modifier = keyModifier,
-                fontSize = dims.fontSize,
-                cornerRadius = dims.cornerRadius,
-                backgroundColor = voiceBg,
-            )
         }
 
         is Key.Hide -> QwertyKeyButton(
@@ -458,6 +513,7 @@ private fun RenderGridKey(
             fontSize = dims.fontSize,
             cornerRadius = dims.cornerRadius,
             backgroundColor = ActionKeyBackground,
+            showPreview = false,
         )
     }
 }
