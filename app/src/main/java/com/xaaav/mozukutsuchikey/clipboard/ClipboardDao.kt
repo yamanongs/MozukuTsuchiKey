@@ -22,6 +22,6 @@ interface ClipboardDao {
     @Query("DELETE FROM clipboard_items WHERE id = :id")
     suspend fun delete(id: Long)
 
-    @Query("DELETE FROM clipboard_items WHERE text = :text")
+    @Query("DELETE FROM clipboard_items WHERE text = :text AND pinned = 0")
     suspend fun deleteByText(text: String)
 }

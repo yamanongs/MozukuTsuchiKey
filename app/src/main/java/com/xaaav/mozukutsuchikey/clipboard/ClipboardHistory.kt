@@ -24,12 +24,13 @@ class ClipboardHistory(
         val text = clip.getItemAt(0)?.text?.toString()
         if (text.isNullOrBlank()) return@OnPrimaryClipChangedListener
 
+        val trimmedText = text.take(MAX_TEXT_LENGTH)
         scope.launch {
             // Clean up expired (1 hour TTL for unpinned)
             dao.deleteExpired(System.currentTimeMillis() - TTL_MS)
-            // Remove duplicate then re-insert to update timestamp
-            dao.deleteByText(text)
-            dao.insert(ClipboardEntity(text = text))
+            // Remove unpinned duplicate then re-insert to update timestamp
+            dao.deleteByText(trimmedText)
+            dao.insert(ClipboardEntity(text = trimmedText))
         }
     }
 
@@ -51,5 +52,6 @@ class ClipboardHistory(
 
     companion object {
         private const val TTL_MS = 60 * 60 * 1000L // 1 hour
+        private const val MAX_TEXT_LENGTH = 10_000
     }
 }
