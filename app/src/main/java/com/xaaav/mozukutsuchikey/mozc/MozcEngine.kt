@@ -70,7 +70,7 @@ class MozcEngine(private val context: Context) {
             .setId(sessionId)
             .setCommand(
                 ProtoCommands.SessionCommand.newBuilder()
-                    .setType(ProtoCommands.SessionCommand.CommandType.SELECT_CANDIDATE)
+                    .setType(ProtoCommands.SessionCommand.CommandType.SUBMIT_CANDIDATE)
                     .setId(candidateId)
             )
             .build()

@@ -21,10 +21,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val BarBackground = Color(0xFF1A1A2E)
-private val ComposingColor = Color(0xFF00FF9C)
-private val CandidateChipBackground = Color(0xFF2A2A4E)
-private val DividerColor = Color(0xFF444466)
+private val BarBackground = Color(0xFF1A1A1E)
+private val ComposingColor = Color.White
+private val CandidateChipBackground = Color(0xFF2E2E34)
+private val DividerColor = Color(0xFF444448)
 
 @Composable
 fun MozcCandidateBar(
