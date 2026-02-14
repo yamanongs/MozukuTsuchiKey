@@ -1,7 +1,16 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+}
+
+val localPropsFile = rootProject.file("local.properties")
+val localProperties = Properties().apply {
+    if (localPropsFile.exists()) {
+        localPropsFile.inputStream().use { load(it) }
+    }
 }
 
 android {
@@ -18,12 +27,22 @@ android {
         versionName = "0.1"
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../keystore/release.jks")
+            storePassword = localProperties["RELEASE_STORE_PASSWORD"]?.toString() ?: ""
+            keyAlias = "mozukutsuchikey"
+            keyPassword = localProperties["RELEASE_KEY_PASSWORD"]?.toString() ?: ""
+        }
+    }
+
     buildTypes {
         debug {
             applicationIdSuffix = ".debug"
         }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
