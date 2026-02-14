@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Abc
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Tag
@@ -477,14 +478,13 @@ private fun RenderGridKey(
         }
 
         is Key.SymbolSwitch -> QwertyKeyButton(
-            label = if (symbolMode) "Abc" else "#+=",
-            icon = if (symbolMode) null else Icons.Default.Tag,
+            icon = if (symbolMode) Icons.Default.Abc else Icons.Default.Tag,
             onClick = { onKeyPress(key) },
             modifier = keyModifier,
             fontSize = dims.fontSize,
             cornerRadius = dims.cornerRadius,
-            backgroundColor = SymbolSwitchBackground,
-            pressedBackgroundColor = SymbolSwitchPressedBackground,
+            backgroundColor = if (symbolMode) SymbolSwitchBackground else ActionKeyBackground,
+            pressedBackgroundColor = if (symbolMode) SymbolSwitchPressedBackground else KeyPressedBackground,
             showPreview = false,
         )
 
