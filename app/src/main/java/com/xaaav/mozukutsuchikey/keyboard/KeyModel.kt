@@ -20,7 +20,7 @@ sealed class Key {
     class JpToggle : Key()
     class SymbolSwitch : Key()
     class VoiceInput : Key()
-    class Hide : Key()
+    class Clipboard : Key()
 }
 
 data class GridPosition(

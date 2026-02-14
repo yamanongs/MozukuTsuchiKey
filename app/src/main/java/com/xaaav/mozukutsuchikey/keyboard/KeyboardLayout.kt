@@ -101,7 +101,7 @@ val GRID_KEYS: List<GridKey> = listOf(
     GridKey(Key.SymbolSwitch(), GridPosition(148, R5, 60, RH)),
     GridKey(Key.Char(' ', ' '), GridPosition(220, R5, 228, RH)),
     GridKey(Key.VoiceInput(), GridPosition(460, R5, 60, RH)),
-    GridKey(Key.Hide(), GridPosition(532, R5, 36, RH)),
+    GridKey(Key.Clipboard(), GridPosition(532, R5, 36, RH)),
     GridKey(Key.Repeatable("\u2190", icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft, keyCode = AndroidKeyEvent.KEYCODE_DPAD_LEFT), GridPosition(580, R5, 36, RH)),
     GridKey(Key.Repeatable("\u2193", icon = Icons.Default.KeyboardArrowDown, keyCode = AndroidKeyEvent.KEYCODE_DPAD_DOWN), GridPosition(628, R5, 36, RH)),
     GridKey(Key.Repeatable("\u2192", icon = Icons.AutoMirrored.Filled.KeyboardArrowRight, keyCode = AndroidKeyEvent.KEYCODE_DPAD_RIGHT), GridPosition(676, R5, 36, RH)),

@@ -15,6 +15,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.xaaav.mozukutsuchikey.clipboard.ClipboardHistory
 import com.xaaav.mozukutsuchikey.keyboard.ImeKeyboard
 import com.xaaav.mozukutsuchikey.mozc.MozcInputController
 import kotlinx.coroutines.CoroutineScope
@@ -39,6 +40,7 @@ class MozukuTsuchiKeyService : InputMethodService(),
         get() = savedStateRegistryController.savedStateRegistry
 
     private lateinit var mozcController: MozcInputController
+    private lateinit var clipboardHistory: ClipboardHistory
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     override fun onCreate() {
@@ -47,6 +49,8 @@ class MozukuTsuchiKeyService : InputMethodService(),
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
 
         mozcController = MozcInputController(this)
+        clipboardHistory = ClipboardHistory(this, serviceScope)
+        clipboardHistory.startListening()
         serviceScope.launch(Dispatchers.IO) {
             mozcController.ensureInitialized()
         }
@@ -71,7 +75,7 @@ class MozukuTsuchiKeyService : InputMethodService(),
                 ImeKeyboard(
                     inputConnection = { currentInputConnection },
                     mozcController = mozcController,
-                    onHideKeyboard = { requestHideSelf(0) },
+                    clipboardHistory = clipboardHistory,
                 )
             }
         }
@@ -80,6 +84,7 @@ class MozukuTsuchiKeyService : InputMethodService(),
 
     override fun onDestroy() {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        clipboardHistory.stopListening()
         mozcController.destroy()
         store.clear()
         serviceScope.cancel()

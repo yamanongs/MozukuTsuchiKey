@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Abc
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -32,11 +33,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.xaaav.mozukutsuchikey.PermissionActivity
+import com.xaaav.mozukutsuchikey.clipboard.ClipboardBar
+import com.xaaav.mozukutsuchikey.clipboard.ClipboardHistory
 import com.xaaav.mozukutsuchikey.mozc.MozcCandidateBar
 import com.xaaav.mozukutsuchikey.mozc.MozcInputController
 import kotlinx.coroutines.Job
@@ -49,7 +53,7 @@ import java.util.Locale
 fun ImeKeyboard(
     inputConnection: () -> InputConnection?,
     mozcController: MozcInputController,
-    onHideKeyboard: () -> Unit,
+    clipboardHistory: ClipboardHistory,
     modifier: Modifier = Modifier,
 ) {
     val dims = getQwertyDimensions()
@@ -57,6 +61,8 @@ fun ImeKeyboard(
 
     var isJapaneseMode by remember { mutableStateOf(false) }
     var symbolMode by remember { mutableStateOf(false) }
+    var showClipboard by remember { mutableStateOf(false) }
+    val clipboardItems by clipboardHistory.items.collectAsStateWithLifecycle()
     var isListening by remember { mutableStateOf(false) }
     var isSpeaking by remember { mutableStateOf(false) }
     val voiceScope = rememberCoroutineScope()
@@ -296,7 +302,9 @@ fun ImeKeyboard(
                 }
             }
 
-            is Key.Hide -> onHideKeyboard()
+            is Key.Clipboard -> {
+                showClipboard = !showClipboard
+            }
         }
     }
 
@@ -325,12 +333,21 @@ fun ImeKeyboard(
         color = KeyboardBackground,
     ) {
         Column {
-            // Mozc candidate bar
+            // Mozc candidate bar (priority over clipboard bar)
             if (mozcController.isComposing) {
                 MozcCandidateBar(
                     composingText = mozcController.composingText,
                     candidates = mozcController.candidates,
                     onCandidateSelected = { mozcController.selectCandidate(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else if (showClipboard && clipboardItems.isNotEmpty()) {
+                ClipboardBar(
+                    items = clipboardItems,
+                    onItemSelected = { text ->
+                        currentInputConnection()?.commitText(text, 1)
+                        showClipboard = false
+                    },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -508,8 +525,8 @@ private fun RenderGridKey(
             }
         }
 
-        is Key.Hide -> QwertyKeyButton(
-            label = "\u25BC",
+        is Key.Clipboard -> QwertyKeyButton(
+            icon = Icons.Default.ContentPaste,
             onClick = { onKeyPress(key) },
             modifier = keyModifier,
             fontSize = dims.fontSize,
