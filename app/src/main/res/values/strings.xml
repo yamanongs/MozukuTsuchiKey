@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MozukuTsuchiKey</string>
+    <string name="ime_label">MozukuTsuchiKey</string>
+    <string name="subtype_en">English</string>
+    <string name="subtype_ja">Japanese</string>
+</resources>
