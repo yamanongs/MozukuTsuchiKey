@@ -2,6 +2,7 @@ package com.xaaav.mozukutsuchikey
 
 import android.inputmethodservice.InputMethodService
 import android.view.View
+import android.view.inputmethod.EditorInfo
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.Lifecycle
@@ -22,6 +23,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class MozukuTsuchiKeyService : InputMethodService(),
@@ -43,6 +47,9 @@ class MozukuTsuchiKeyService : InputMethodService(),
     private lateinit var clipboardHistory: ClipboardHistory
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
+    private val _inputActive = MutableStateFlow(true)
+    val inputActive: StateFlow<Boolean> = _inputActive.asStateFlow()
+
     override fun onCreate() {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
@@ -54,6 +61,16 @@ class MozukuTsuchiKeyService : InputMethodService(),
         serviceScope.launch(Dispatchers.IO) {
             mozcController.ensureInitialized()
         }
+    }
+
+    override fun onStartInput(info: EditorInfo?, restarting: Boolean) {
+        super.onStartInput(info, restarting)
+        _inputActive.value = true
+    }
+
+    override fun onFinishInput() {
+        _inputActive.value = false
+        super.onFinishInput()
     }
 
     override fun onCreateInputView(): View {
@@ -76,6 +93,7 @@ class MozukuTsuchiKeyService : InputMethodService(),
                     inputConnection = { currentInputConnection },
                     mozcController = mozcController,
                     clipboardHistory = clipboardHistory,
+                    inputActive = inputActive,
                 )
             }
         }

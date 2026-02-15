@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.inputmethod.InputConnection
 import androidx.compose.foundation.layout.Box
@@ -27,6 +28,7 @@ import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,6 +47,7 @@ import com.xaaav.mozukutsuchikey.mozc.MozcCandidateBar
 import com.xaaav.mozukutsuchikey.mozc.MozcInputController
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import org.mozc.android.inputmethod.japanese.protobuf.ProtoCommands.KeyEvent.SpecialKey
 import java.util.Locale
@@ -54,6 +57,7 @@ fun ImeKeyboard(
     inputConnection: () -> InputConnection?,
     mozcController: MozcInputController,
     clipboardHistory: ClipboardHistory,
+    inputActive: StateFlow<Boolean>,
     modifier: Modifier = Modifier,
 ) {
     val dims = getQwertyDimensions()
@@ -68,8 +72,8 @@ fun ImeKeyboard(
     val voiceScope = rememberCoroutineScope()
     var idleTimeoutJob by remember { mutableStateOf<Job?>(null) }
 
-    val speechRecognizer = remember {
-        SpeechRecognizer.createSpeechRecognizer(context)
+    var speechRecognizer by remember {
+        mutableStateOf(SpeechRecognizer.createSpeechRecognizer(context))
     }
     DisposableEffect(Unit) {
         onDispose {
@@ -84,6 +88,14 @@ fun ImeKeyboard(
         speechRecognizer.cancel()
         isListening = false
         isSpeaking = false
+    }
+
+    // inputActive が false になったら（アプリ切替時など）マイクを停止
+    val isInputActive by inputActive.collectAsStateWithLifecycle()
+    LaunchedEffect(isInputActive) {
+        if (!isInputActive && isListening) {
+            stopVoiceInput()
+        }
     }
 
     fun resetIdleTimeout() {
@@ -106,6 +118,11 @@ fun ImeKeyboard(
 
     val currentInputConnection by rememberUpdatedState(inputConnection)
 
+    fun recreateSpeechRecognizer() {
+        speechRecognizer.destroy()
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+    }
+
     val recognitionListener = remember {
         object : RecognitionListener {
             override fun onResults(results: Bundle?) {
@@ -119,6 +136,8 @@ fun ImeKeyboard(
                 if (isListening) startListening()
             }
             override fun onError(error: Int) {
+                Log.w("VoiceInput", "SpeechRecognizer error: $error")
+                recreateSpeechRecognizer()
                 if (isListening && (error == SpeechRecognizer.ERROR_NO_MATCH
                             || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) {
                     startListening()
@@ -127,7 +146,7 @@ fun ImeKeyboard(
                 }
             }
             override fun onEndOfSpeech() { isSpeaking = false }
-            override fun onReadyForSpeech(params: Bundle?) {}
+            override fun onReadyForSpeech(params: Bundle?) { resetIdleTimeout() }
             override fun onBeginningOfSpeech() { isSpeaking = true; resetIdleTimeout() }
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
@@ -292,7 +311,6 @@ fun ImeKeyboard(
                     ) == PackageManager.PERMISSION_GRANTED
                     if (hasPermission) {
                         startListening()
-                        resetIdleTimeout()
                     } else {
                         val intent = Intent(context, PermissionActivity::class.java).apply {
                             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
