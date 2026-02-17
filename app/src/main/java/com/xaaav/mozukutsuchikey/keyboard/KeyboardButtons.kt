@@ -71,6 +71,7 @@ fun QwertyKeyButton(
             isFloating && backgroundColor.alpha >= 1f -> Color.Transparent
             else -> backgroundColor
         }
+        val textColor = if (isFloating) FloatingKeyTextColor else KeyTextColor
         val shape = RoundedCornerShape(cornerRadius)
 
         Surface(
@@ -115,7 +116,7 @@ fun QwertyKeyButton(
                 if (label != null && label.isNotEmpty()) {
                     Text(
                         text = label,
-                        color = KeyTextColor,
+                        color = textColor,
                         fontSize = fontSize.sp,
                         maxLines = 1,
                     )
@@ -123,7 +124,7 @@ fun QwertyKeyButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = KeyTextColor,
+                        tint = textColor,
                         modifier = Modifier.size((fontSize + 4).dp),
                     )
                 }
@@ -137,6 +138,7 @@ fun QwertyKeyButton(
             isFloating && backgroundColor.alpha >= 1f -> Color.Transparent
             else -> backgroundColor
         }
+        val textColor = if (isFloating) FloatingKeyTextColor else KeyTextColor
         val shape = RoundedCornerShape(cornerRadius)
 
         Surface(
@@ -161,7 +163,7 @@ fun QwertyKeyButton(
                 if (label != null && label.isNotEmpty()) {
                     Text(
                         text = label,
-                        color = KeyTextColor,
+                        color = textColor,
                         fontSize = fontSize.sp,
                         maxLines = 1,
                     )
@@ -169,7 +171,7 @@ fun QwertyKeyButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = KeyTextColor,
+                        tint = textColor,
                         modifier = Modifier.size((fontSize + 4).dp),
                     )
                 }
@@ -236,6 +238,7 @@ fun QwertyRepeatableButton(
         isFloating -> Color.Transparent
         else -> backgroundColor
     }
+    val textColor = if (isFloating) FloatingKeyTextColor else KeyTextColor
     val shape = RoundedCornerShape(cornerRadius)
 
     Surface(
@@ -281,13 +284,13 @@ fun QwertyRepeatableButton(
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
-                    tint = KeyTextColor,
+                    tint = textColor,
                     modifier = Modifier.size((fontSize + 4).dp),
                 )
             } else {
                 Text(
                     text = label,
-                    color = KeyTextColor,
+                    color = textColor,
                     fontSize = fontSize.sp,
                     maxLines = 1,
                 )
@@ -315,9 +318,10 @@ fun QwertyModifierButton(
         isFloating -> Color.Transparent
         else -> ModifierOffBackground
     }
-    val textColor = when (level) {
-        ModifierLevel.OFF -> ModifierOffTextColor
-        else -> Color.White
+    val textColor = when {
+        level != ModifierLevel.OFF -> Color.White
+        isFloating -> FloatingKeyTextColor
+        else -> ModifierOffTextColor
     }
     val shape = RoundedCornerShape(cornerRadius)
 
