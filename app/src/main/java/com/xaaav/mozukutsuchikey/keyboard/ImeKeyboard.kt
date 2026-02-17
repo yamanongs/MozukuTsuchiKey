@@ -37,6 +37,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -61,6 +62,8 @@ fun ImeKeyboard(
     modifier: Modifier = Modifier,
 ) {
     val dims = getQwertyDimensions()
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val gridKeys = if (screenWidthDp > 600) GRID_KEYS_SPLIT else GRID_KEYS
     val context = LocalContext.current
 
     var isJapaneseMode by remember { mutableStateOf(false) }
@@ -373,7 +376,7 @@ fun ImeKeyboard(
 
             // Keyboard grid
             KeyboardGrid(
-                gridKeys = GRID_KEYS,
+                gridKeys = gridKeys,
                 cols = GRID_COLS,
                 rows = GRID_ROWS,
                 modifier = Modifier
