@@ -55,10 +55,27 @@ class MozukuTsuchiKeyService : InputMethodService(),
 
     var keyboardBounds: android.graphics.Rect? = null
     private var isFloatingMode = false
+    private var currentComposeView: View? = null
 
     private fun isNarrowScreen(): Boolean {
         val widthDp = resources.configuration.screenWidthDp
         return widthDp <= 600
+    }
+
+    private fun setWindowBackground(transparent: Boolean) {
+        val color = if (transparent) android.graphics.Color.TRANSPARENT else android.graphics.Color.BLACK
+        window?.window?.let { w ->
+            w.setBackgroundDrawable(ColorDrawable(color))
+            if (transparent) w.setFormat(PixelFormat.TRANSLUCENT) else w.setFormat(PixelFormat.OPAQUE)
+            w.decorView.setBackgroundColor(color)
+        }
+        // Also update framework container views between ComposeView and decorView
+        val cv = currentComposeView ?: return
+        var parent = cv.parent
+        while (parent is View) {
+            (parent as View).setBackgroundColor(color)
+            parent = parent.parent
+        }
     }
 
     override fun onCreate() {
@@ -115,12 +132,7 @@ class MozukuTsuchiKeyService : InputMethodService(),
         isFloatingMode = !isNarrowScreen()
 
         if (isFloatingMode) {
-            // Make IME window transparent for floating keyboard
-            window?.window?.let { w ->
-                w.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
-                w.setFormat(PixelFormat.TRANSLUCENT)
-                w.decorView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            }
+            setWindowBackground(transparent = true)
         }
 
         // Set ViewTree owners on the IME window's decorView so all child views inherit them
@@ -140,26 +152,28 @@ class MozukuTsuchiKeyService : InputMethodService(),
                     mozcController = mozcController,
                     clipboardHistory = clipboardHistory,
                     inputActive = inputActive,
-                    onKeyboardBoundsChanged = if (isFloatingMode) { rect ->
+                    onKeyboardBoundsChanged = { rect ->
                         keyboardBounds = android.graphics.Rect(
                             rect.left.toInt(),
                             rect.top.toInt(),
                             rect.right.toInt(),
                             rect.bottom.toInt(),
                         )
-                    } else null,
+                    },
+                    onFloatingStateChanged = { floating ->
+                        isFloatingMode = floating
+                        setWindowBackground(floating)
+                    },
                 )
             }
         }
 
+        currentComposeView = composeView
+
         if (isFloatingMode) {
             // Clear backgrounds on framework container views for transparency
             composeView.post {
-                var parent = composeView.parent
-                while (parent is View) {
-                    (parent as View).setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                    parent = parent.parent
-                }
+                setWindowBackground(transparent = true)
             }
         }
 

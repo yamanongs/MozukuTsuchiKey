@@ -180,10 +180,11 @@ val GRID_KEYS_SPLIT: List<GridKey> = listOf(
     GridKey(Key.Char('.', '>', symbol = '%'), GridPosition(596, R4_S, 36, RH_S)),
     GridKey(Key.Repeatable("\u2191", icon = Icons.Default.KeyboardArrowUp, keyCode = AndroidKeyEvent.KEYCODE_DPAD_UP), GridPosition(638, R4_S, 36, RH_S)),
 
-    // Row 5 — Left: Ctrl Alt Sym
+    // Row 5 — Left: Ctrl Alt Sym Dock
     GridKey(Key.Modifier(ModifierType.CTRL), GridPosition(4, R5_S, 54, RH_S)),
     GridKey(Key.Modifier(ModifierType.ALT), GridPosition(64, R5_S, 54, RH_S)),
     GridKey(Key.SymbolSwitch(), GridPosition(124, R5_S, 54, RH_S)),
+    GridKey(Key.DockToggle(), GridPosition(184, R5_S, 36, RH_S)),
     // Row 5 — Right: Space Voice Clip ← ↓ →
     GridKey(Key.Char(' ', ' '), GridPosition(419, R5_S, 69, RH_S)),
     GridKey(Key.VoiceInput(), GridPosition(494, R5_S, 54, RH_S)),

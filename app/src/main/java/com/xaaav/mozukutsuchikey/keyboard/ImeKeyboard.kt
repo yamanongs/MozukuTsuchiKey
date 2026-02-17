@@ -25,7 +25,9 @@ import androidx.compose.material.icons.filled.Abc
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.ContentPaste
+import androidx.compose.material.icons.filled.OpenInFull
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -75,6 +77,7 @@ fun ImeKeyboard(
     inputActive: StateFlow<Boolean>,
     modifier: Modifier = Modifier,
     onKeyboardBoundsChanged: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
+    onFloatingStateChanged: ((Boolean) -> Unit)? = null,
 ) {
     val dims = getQwertyDimensions()
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -95,6 +98,10 @@ fun ImeKeyboard(
         if (!isJapaneseMode) mozcController.reset()
     }
 
+    var isFloating by remember { mutableStateOf(true) }
+    LaunchedEffect(isFloating) {
+        onFloatingStateChanged?.invoke(isFloating)
+    }
     var showClipboard by remember { mutableStateOf(false) }
     val clipboardItems by clipboardHistory.items.collectAsStateWithLifecycle()
     var isListening by remember { mutableStateOf(false) }
@@ -402,6 +409,10 @@ fun ImeKeyboard(
             is Key.Clipboard -> {
                 showClipboard = !showClipboard
             }
+
+            is Key.DockToggle -> {
+                isFloating = !isFloating
+            }
         }
     }
 
@@ -425,7 +436,6 @@ fun ImeKeyboard(
     }
 
     val isSplitLayout = screenWidthDp > 600
-    val isFloating = true // Keys always use transparent/border style
 
     // ==================== Flick keyboard event handler ====================
 
@@ -675,21 +685,34 @@ fun ImeKeyboard(
             }
         }
     } else if (isSplitLayout) {
-        Box(
-            modifier = modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars),
-            contentAlignment = Alignment.BottomCenter,
-        ) {
+        if (isFloating) {
+            Box(
+                modifier = modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth(0.97f)
+                        .onGloballyPositioned { coords ->
+                            onKeyboardBoundsChanged?.invoke(coords.boundsInWindow())
+                        },
+                    shape = RoundedCornerShape(12.dp),
+                    color = FloatingKeyboardBackground,
+                    shadowElevation = 8.dp,
+                ) {
+                    qwertyKeyboardContent()
+                }
+            }
+        } else {
             Surface(
-                modifier = Modifier
-                    .fillMaxWidth(0.97f)
+                modifier = modifier
+                    .windowInsetsPadding(WindowInsets.navigationBars)
                     .onGloballyPositioned { coords ->
                         onKeyboardBoundsChanged?.invoke(coords.boundsInWindow())
                     },
-                shape = RoundedCornerShape(12.dp),
-                color = FloatingKeyboardBackground,
-                shadowElevation = 8.dp,
+                color = FlickKeyboardBackground,
             ) {
                 qwertyKeyboardContent()
             }
@@ -866,6 +889,17 @@ private fun RenderGridKey(
 
         is Key.Clipboard -> QwertyKeyButton(
             icon = Icons.Default.ContentPaste,
+            onClick = { onKeyPress(key) },
+            modifier = keyModifier,
+            fontSize = dims.fontSize,
+            cornerRadius = dims.cornerRadius,
+            backgroundColor = ActionKeyBackground,
+            showPreview = false,
+            isFloating = isFloating,
+        )
+
+        is Key.DockToggle -> QwertyKeyButton(
+            icon = if (isFloating) Icons.Default.VerticalAlignBottom else Icons.Default.OpenInFull,
             onClick = { onKeyPress(key) },
             modifier = keyModifier,
             fontSize = dims.fontSize,

@@ -21,6 +21,7 @@ sealed class Key {
     class SymbolSwitch : Key()
     class VoiceInput : Key()
     class Clipboard : Key()
+    class DockToggle : Key()
 }
 
 data class GridPosition(
