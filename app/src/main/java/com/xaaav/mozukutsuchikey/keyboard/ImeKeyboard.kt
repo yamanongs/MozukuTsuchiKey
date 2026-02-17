@@ -8,6 +8,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import android.view.KeyCharacterMap
 import android.view.KeyEvent as AndroidKeyEvent
 import android.view.inputmethod.InputConnection
 import androidx.compose.foundation.layout.Box
@@ -231,9 +232,10 @@ fun ImeKeyboard(
 
     fun sendKeyEvent(keyCode: Int, metaState: Int = 0) {
         val ic = currentInputConnection() ?: return
-        val now = android.os.SystemClock.uptimeMillis()
-        ic.sendKeyEvent(AndroidKeyEvent(now, now, AndroidKeyEvent.ACTION_DOWN, keyCode, 0, metaState))
-        ic.sendKeyEvent(AndroidKeyEvent(now, now, AndroidKeyEvent.ACTION_UP, keyCode, 0, metaState))
+        val downTime = android.os.SystemClock.uptimeMillis()
+        val flags = AndroidKeyEvent.FLAG_SOFT_KEYBOARD or AndroidKeyEvent.FLAG_KEEP_TOUCH_MODE
+        ic.sendKeyEvent(AndroidKeyEvent(downTime, downTime, AndroidKeyEvent.ACTION_DOWN, keyCode, 0, metaState, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, flags))
+        ic.sendKeyEvent(AndroidKeyEvent(downTime, android.os.SystemClock.uptimeMillis(), AndroidKeyEvent.ACTION_UP, keyCode, 0, metaState, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, flags))
     }
 
     fun buildMetaState(): Int {
@@ -242,6 +244,17 @@ fun ImeKeyboard(
         if (isAltActive) meta = meta or AndroidKeyEvent.META_ALT_ON or AndroidKeyEvent.META_ALT_LEFT_ON
         if (isShiftActive) meta = meta or AndroidKeyEvent.META_SHIFT_ON or AndroidKeyEvent.META_SHIFT_LEFT_ON
         return meta
+    }
+
+    fun moveCursor(offset: Int) {
+        val ic = currentInputConnection() ?: return
+        ic.beginBatchEdit()
+        val extracted = ic.getExtractedText(android.view.inputmethod.ExtractedTextRequest(), 0)
+        if (extracted != null) {
+            val newPos = (extracted.selectionStart + offset).coerceIn(0, extracted.text.length)
+            ic.setSelection(newPos, newPos)
+        }
+        ic.endBatchEdit()
     }
 
     fun routeToMozc(key: Key): Boolean {
@@ -323,6 +336,26 @@ fun ImeKeyboard(
             is Key.Repeatable -> {
                 if (isJapaneseMode && routeToMozc(key)) {
                     // consumed by Mozc
+                } else if (key.keyCode == AndroidKeyEvent.KEYCODE_DEL && !isCtrlActive && !isAltActive) {
+                    val ic = currentInputConnection()
+                    val sel = ic?.getSelectedText(0)
+                    if (!sel.isNullOrEmpty()) {
+                        ic.commitText("", 1)
+                    } else {
+                        ic?.deleteSurroundingText(1, 0)
+                    }
+                } else if (key.keyCode == AndroidKeyEvent.KEYCODE_FORWARD_DEL && !isCtrlActive && !isAltActive) {
+                    val ic = currentInputConnection()
+                    val sel = ic?.getSelectedText(0)
+                    if (!sel.isNullOrEmpty()) {
+                        ic.commitText("", 1)
+                    } else {
+                        ic?.deleteSurroundingText(0, 1)
+                    }
+                } else if (key.keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT && !isCtrlActive && !isAltActive) {
+                    moveCursor(-1)
+                } else if (key.keyCode == AndroidKeyEvent.KEYCODE_DPAD_RIGHT && !isCtrlActive && !isAltActive) {
+                    moveCursor(1)
                 } else {
                     sendKeyEvent(key.keyCode, buildMetaState())
                 }
@@ -381,12 +414,13 @@ fun ImeKeyboard(
     val composingText = mozcController.composingText
     val prevComposingText = remember { mutableStateOf("") }
     if (composingText != prevComposingText.value) {
+        val wasComposing = prevComposingText.value.isNotEmpty()
         prevComposingText.value = composingText
         val ic = currentInputConnection()
         if (composingText.isNotEmpty()) {
             ic?.setComposingText(composingText, 1)
-        } else {
-            ic?.setComposingText("", 0)
+        } else if (wasComposing) {
+            ic?.finishComposingText()
         }
     }
 
@@ -497,7 +531,13 @@ fun ImeKeyboard(
                 if (mozcController.isComposing) {
                     mozcController.handleSpecialKey(SpecialKey.BACKSPACE)
                 } else {
-                    sendKeyEvent(AndroidKeyEvent.KEYCODE_DEL)
+                    val ic = currentInputConnection()
+                    val sel = ic?.getSelectedText(0)
+                    if (!sel.isNullOrEmpty()) {
+                        ic.commitText("", 1)
+                    } else {
+                        ic?.deleteSurroundingText(1, 0)
+                    }
                 }
             }
             is FlickEvent.Enter -> {
@@ -521,7 +561,7 @@ fun ImeKeyboard(
                 if (mozcController.isComposing) {
                     mozcController.handleSpecialKey(SpecialKey.LEFT)
                 } else {
-                    sendKeyEvent(AndroidKeyEvent.KEYCODE_DPAD_LEFT)
+                    moveCursor(-1)
                 }
             }
             is FlickEvent.CursorRight -> {
@@ -529,7 +569,7 @@ fun ImeKeyboard(
                 if (mozcController.isComposing) {
                     mozcController.handleSpecialKey(SpecialKey.RIGHT)
                 } else {
-                    sendKeyEvent(AndroidKeyEvent.KEYCODE_DPAD_RIGHT)
+                    moveCursor(1)
                 }
             }
             is FlickEvent.ModeChanged -> {
