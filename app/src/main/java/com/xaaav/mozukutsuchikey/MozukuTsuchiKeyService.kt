@@ -73,6 +73,16 @@ class MozukuTsuchiKeyService : InputMethodService(),
         super.onFinishInput()
     }
 
+    override fun onWindowShown() {
+        super.onWindowShown()
+        _inputActive.value = true
+    }
+
+    override fun onWindowHidden() {
+        _inputActive.value = false
+        super.onWindowHidden()
+    }
+
     override fun onCreateInputView(): View {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)

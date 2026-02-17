@@ -91,10 +91,11 @@ fun ImeKeyboard(
     }
 
     // inputActive が false になったら（アプリ切替時など）マイクを停止
-    val isInputActive by inputActive.collectAsStateWithLifecycle()
-    LaunchedEffect(isInputActive) {
-        if (!isInputActive && isListening) {
-            stopVoiceInput()
+    LaunchedEffect(Unit) {
+        inputActive.collect { active ->
+            if (!active && isListening) {
+                stopVoiceInput()
+            }
         }
     }
 
