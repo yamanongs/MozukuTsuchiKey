@@ -98,9 +98,12 @@ fun ImeKeyboard(
         if (!isJapaneseMode) mozcController.reset()
     }
 
+    val isSplitLayout = screenWidthDp > 600
     var isFloating by remember { mutableStateOf(true) }
-    LaunchedEffect(isFloating) {
-        onFloatingStateChanged?.invoke(isFloating)
+    LaunchedEffect(isFloating, isSplitLayout) {
+        if (isSplitLayout) {
+            onFloatingStateChanged?.invoke(isFloating)
+        }
     }
     var showClipboard by remember { mutableStateOf(false) }
     val clipboardItems by clipboardHistory.items.collectAsStateWithLifecycle()
@@ -434,8 +437,6 @@ fun ImeKeyboard(
             ic?.finishComposingText()
         }
     }
-
-    val isSplitLayout = screenWidthDp > 600
 
     // ==================== Flick keyboard event handler ====================
 
