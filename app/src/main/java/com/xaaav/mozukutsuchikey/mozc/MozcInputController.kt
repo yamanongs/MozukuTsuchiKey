@@ -11,6 +11,7 @@ class MozcInputController(private val context: Context) {
 
     private var engine: MozcEngine? = null
     private var initAttempted = false
+    private var lastWasBackspace = false
 
     var composingText by mutableStateOf("")
         private set
@@ -40,6 +41,7 @@ class MozcInputController(private val context: Context) {
 
     fun handleCodePoint(codePoint: Int): Boolean {
         val e = engine ?: return false
+        lastWasBackspace = false
         val result = e.sendKey(codePoint)
         applyResult(result)
         return result.consumed
@@ -47,6 +49,7 @@ class MozcInputController(private val context: Context) {
 
     fun handleSpecialKey(specialKey: SpecialKey): Boolean {
         val e = engine ?: return false
+        lastWasBackspace = specialKey == SpecialKey.BACKSPACE
         val result = e.sendSpecialKey(specialKey)
         applyResult(result)
         return result.consumed
@@ -54,6 +57,7 @@ class MozcInputController(private val context: Context) {
 
     fun selectCandidate(candidateId: Int): Boolean {
         val e = engine ?: return false
+        lastWasBackspace = false
         val result = e.selectCandidate(candidateId)
         applyResult(result)
         return result.consumed
@@ -61,6 +65,7 @@ class MozcInputController(private val context: Context) {
 
     fun reset() {
         val e = engine ?: return
+        lastWasBackspace = false
         val result = e.reset()
         applyResult(result)
     }
@@ -76,9 +81,10 @@ class MozcInputController(private val context: Context) {
     private fun applyResult(result: MozcResult) {
         composingText = result.composingText ?: ""
         candidates = result.candidates
-        if (result.committedText != null) {
+        if (result.committedText != null && !lastWasBackspace) {
             onCommit?.invoke(result.committedText)
         }
+        lastWasBackspace = false
     }
 
     companion object {

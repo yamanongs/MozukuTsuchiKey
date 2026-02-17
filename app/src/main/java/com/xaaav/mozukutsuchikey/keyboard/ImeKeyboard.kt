@@ -344,6 +344,7 @@ fun ImeKeyboard(
                 symbolMode = !symbolMode
                 if (symbolMode) {
                     shiftState = ModifierLevel.OFF
+                    if (mozcController.isComposing) mozcController.reset()
                 }
             }
 
@@ -373,9 +374,7 @@ fun ImeKeyboard(
 
     // Connect Mozc commit to InputConnection
     mozcController.onCommit = { text ->
-        val ic = currentInputConnection()
-        ic?.commitText(text, 1)
-        ic?.finishComposingText()
+        currentInputConnection()?.commitText(text, 1)
     }
 
     // Update composing text in InputConnection
@@ -387,7 +386,7 @@ fun ImeKeyboard(
         if (composingText.isNotEmpty()) {
             ic?.setComposingText(composingText, 1)
         } else {
-            ic?.finishComposingText()
+            ic?.setComposingText("", 0)
         }
     }
 
