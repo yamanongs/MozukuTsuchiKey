@@ -539,10 +539,10 @@ fun ImeKeyboard(
     // ==================== Layout selection ====================
 
     if (useFlickKeyboard) {
-        // Flick keyboard for narrow screens (≤600dp)
+        // Flick keyboard for narrow screens (≤600dp) — opaque, pushes app content up
         Surface(
             modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars),
-            color = KeyboardBackground,
+            color = FlickKeyboardBackground,
         ) {
             Column {
                 candidateBarContent()

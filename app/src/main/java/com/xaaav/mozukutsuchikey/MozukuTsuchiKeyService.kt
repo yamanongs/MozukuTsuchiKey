@@ -1,5 +1,6 @@
 package com.xaaav.mozukutsuchikey
 
+import android.content.res.Configuration
 import android.graphics.PixelFormat
 import android.graphics.drawable.ColorDrawable
 import android.inputmethodservice.InputMethodService
@@ -53,6 +54,12 @@ class MozukuTsuchiKeyService : InputMethodService(),
     val inputActive: StateFlow<Boolean> = _inputActive.asStateFlow()
 
     var keyboardBounds: android.graphics.Rect? = null
+    private var isFloatingMode = false
+
+    private fun isNarrowScreen(): Boolean {
+        val widthDp = resources.configuration.screenWidthDp
+        return widthDp <= 600
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -89,6 +96,7 @@ class MozukuTsuchiKeyService : InputMethodService(),
 
     override fun onComputeInsets(outInsets: Insets) {
         super.onComputeInsets(outInsets)
+        if (!isFloatingMode) return // Normal mode: let the system handle insets
         val bounds = keyboardBounds
         if (bounds != null && !bounds.isEmpty) {
             outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
@@ -104,11 +112,15 @@ class MozukuTsuchiKeyService : InputMethodService(),
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
 
-        // Make IME window transparent
-        window?.window?.let { w ->
-            w.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
-            w.setFormat(PixelFormat.TRANSLUCENT)
-            w.decorView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        isFloatingMode = !isNarrowScreen()
+
+        if (isFloatingMode) {
+            // Make IME window transparent for floating keyboard
+            window?.window?.let { w ->
+                w.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
+                w.setFormat(PixelFormat.TRANSLUCENT)
+                w.decorView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+            }
         }
 
         // Set ViewTree owners on the IME window's decorView so all child views inherit them
@@ -128,28 +140,40 @@ class MozukuTsuchiKeyService : InputMethodService(),
                     mozcController = mozcController,
                     clipboardHistory = clipboardHistory,
                     inputActive = inputActive,
-                    onKeyboardBoundsChanged = { rect ->
+                    onKeyboardBoundsChanged = if (isFloatingMode) { rect ->
                         keyboardBounds = android.graphics.Rect(
                             rect.left.toInt(),
                             rect.top.toInt(),
                             rect.right.toInt(),
                             rect.bottom.toInt(),
                         )
-                    },
+                    } else null,
                 )
             }
         }
 
-        // Clear backgrounds on framework container views
-        composeView.post {
-            var parent = composeView.parent
-            while (parent is View) {
-                (parent as View).setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                parent = parent.parent
+        if (isFloatingMode) {
+            // Clear backgrounds on framework container views for transparency
+            composeView.post {
+                var parent = composeView.parent
+                while (parent is View) {
+                    (parent as View).setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                    parent = parent.parent
+                }
             }
         }
 
         return composeView
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Re-create input view when screen width changes (fold/unfold)
+        val wasFloating = isFloatingMode
+        val shouldFloat = newConfig.screenWidthDp > 600
+        if (wasFloating != shouldFloat) {
+            setInputView(onCreateInputView())
+        }
     }
 
     override fun onDestroy() {
