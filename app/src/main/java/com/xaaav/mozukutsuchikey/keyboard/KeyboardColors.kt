@@ -23,3 +23,4 @@ val SymbolSwitchBackground = Color(0xFF3A2A4A)
 val SymbolSwitchPressedBackground = Color(0xFF2E1E3E)
 val FloatingKeyboardBackground = Color.Transparent
 val KeyBorderColor = Color(0x80505058)
+val EnterKeyBackground = Color(0xFF1A5A1A)

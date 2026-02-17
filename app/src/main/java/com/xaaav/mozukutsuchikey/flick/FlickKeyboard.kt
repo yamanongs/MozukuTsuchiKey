@@ -24,6 +24,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,7 +49,9 @@ import com.xaaav.mozukutsuchikey.keyboard.ActionKeyBackground
 import com.xaaav.mozukutsuchikey.keyboard.CharKeyBackground
 import com.xaaav.mozukutsuchikey.keyboard.EnModeBackground
 import com.xaaav.mozukutsuchikey.keyboard.JpModeBackground
+import com.xaaav.mozukutsuchikey.keyboard.EnterKeyBackground
 import com.xaaav.mozukutsuchikey.keyboard.KeyBorderColor
+import com.xaaav.mozukutsuchikey.keyboard.KeyPressedBackground
 import com.xaaav.mozukutsuchikey.keyboard.KeyTextColor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -181,7 +184,7 @@ fun FlickKeyboard(
                 icon = Icons.AutoMirrored.Filled.KeyboardReturn,
                 onClick = { onEvent(FlickEvent.Enter) },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                backgroundColor = Color(0xFF1A5A1A),
+                backgroundColor = EnterKeyBackground,
             )
         }
 
@@ -269,13 +272,12 @@ private fun FlickCharKey(
                             changes.forEach { it.consume() }
                             break
                         }
-                        changes.forEach { change ->
-                            val delta = change.positionChange()
-                            if (delta != Offset.Zero) {
-                                dragOffset += delta
-                                flickDirection = computeFlickDirection(dragOffset, thresholdPx)
-                                change.consume()
-                            }
+                        val primary = changes.firstOrNull() ?: continue
+                        val delta = primary.positionChange()
+                        if (delta != Offset.Zero) {
+                            dragOffset += delta
+                            flickDirection = computeFlickDirection(dragOffset, thresholdPx)
+                            primary.consume()
                         }
                     }
 
@@ -293,7 +295,7 @@ private fun FlickCharKey(
                 .fillMaxSize()
                 .border(1.dp, KeyBorderColor, keyShape),
             shape = keyShape,
-            color = if (isPressed) Color(0xFF505058) else Color.Transparent,
+            color = if (isPressed) KeyPressedBackground else Color.Transparent,
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Text(
@@ -375,13 +377,12 @@ private fun FlickDakutenKey(
                             changes.forEach { it.consume() }
                             break
                         }
-                        changes.forEach { change ->
-                            val delta = change.positionChange()
-                            if (delta != Offset.Zero) {
-                                dragOffset += delta
-                                flickDirection = computeFlickDirection(dragOffset, thresholdPx)
-                                change.consume()
-                            }
+                        val primary = changes.firstOrNull() ?: continue
+                        val delta = primary.positionChange()
+                        if (delta != Offset.Zero) {
+                            dragOffset += delta
+                            flickDirection = computeFlickDirection(dragOffset, thresholdPx)
+                            primary.consume()
                         }
                     }
 
@@ -398,7 +399,7 @@ private fun FlickDakutenKey(
                 .fillMaxSize()
                 .border(1.dp, KeyBorderColor, keyShape),
             shape = keyShape,
-            color = if (isPressed) Color(0xFF505058) else Color.Transparent,
+            color = if (isPressed) KeyPressedBackground else Color.Transparent,
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Text(
@@ -436,6 +437,11 @@ private fun SideKeyButton(
     val coroutineScope = rememberCoroutineScope()
     var isPressed by remember { mutableStateOf(false) }
     var repeatJob by remember { mutableStateOf<Job?>(null) }
+    var didRepeat by remember { mutableStateOf(false) }
+
+    DisposableEffect(Unit) {
+        onDispose { repeatJob?.cancel() }
+    }
 
     Box(
         modifier = modifier
@@ -445,12 +451,12 @@ private fun SideKeyButton(
                     val down = awaitFirstDown(requireUnconsumed = false)
                     down.consume()
                     isPressed = true
+                    didRepeat = false
 
                     if (repeatable) {
-                        // Start repeat after initial delay
                         repeatJob = coroutineScope.launch {
-                            currentOnClick() // immediate first action
-                            delay(400)
+                            delay(400) // long-press threshold
+                            didRepeat = true
                             while (true) {
                                 currentOnClick()
                                 delay(50)
@@ -471,6 +477,7 @@ private fun SideKeyButton(
 
                     if (repeatable) {
                         repeatJob?.cancel()
+                        if (!didRepeat) currentOnClick() // short tap: fire once
                     } else {
                         currentOnClick()
                     }
@@ -484,7 +491,7 @@ private fun SideKeyButton(
                 .fillMaxSize()
                 .border(1.dp, KeyBorderColor, keyShape),
             shape = keyShape,
-            color = if (isPressed) Color(0xFF505058) else backgroundColor.copy(alpha = 0.15f),
+            color = if (isPressed) KeyPressedBackground else backgroundColor.copy(alpha = 0.15f),
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 if (icon != null) {

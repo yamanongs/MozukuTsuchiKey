@@ -79,10 +79,20 @@ fun ImeKeyboard(
     val gridKeys = if (screenWidthDp > 600) GRID_KEYS_SPLIT else GRID_KEYS
     val context = LocalContext.current
 
-    var isJapaneseMode by remember { mutableStateOf(false) }
-    var symbolMode by remember { mutableStateOf(false) }
     val useFlickKeyboard = screenWidthDp <= 600
+    var isJapaneseMode by remember { mutableStateOf(useFlickKeyboard) }
+    var symbolMode by remember { mutableStateOf(false) }
     var flickMode by remember { mutableStateOf(FlickInputMode.JAPANESE) }
+
+    // Sync state when switching between flick and QWERTY (e.g. fold/unfold)
+    LaunchedEffect(useFlickKeyboard) {
+        if (useFlickKeyboard) {
+            isJapaneseMode = flickMode == FlickInputMode.JAPANESE
+        }
+        symbolMode = false
+        if (!isJapaneseMode) mozcController.reset()
+    }
+
     var showClipboard by remember { mutableStateOf(false) }
     val clipboardItems by clipboardHistory.items.collectAsStateWithLifecycle()
     var isListening by remember { mutableStateOf(false) }
