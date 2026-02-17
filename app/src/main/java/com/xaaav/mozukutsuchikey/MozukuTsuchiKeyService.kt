@@ -1,5 +1,7 @@
 package com.xaaav.mozukutsuchikey
 
+import android.graphics.PixelFormat
+import android.graphics.drawable.ColorDrawable
 import android.inputmethodservice.InputMethodService
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -87,6 +89,13 @@ class MozukuTsuchiKeyService : InputMethodService(),
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
 
+        // Make IME window transparent
+        window?.window?.let { w ->
+            w.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
+            w.setFormat(PixelFormat.TRANSLUCENT)
+            w.decorView.setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        }
+
         // Set ViewTree owners on the IME window's decorView so all child views inherit them
         window?.window?.decorView?.let { decorView ->
             decorView.setViewTreeLifecycleOwner(this)
@@ -107,6 +116,16 @@ class MozukuTsuchiKeyService : InputMethodService(),
                 )
             }
         }
+
+        // Clear backgrounds on framework container views
+        composeView.post {
+            var parent = composeView.parent
+            while (parent is View) {
+                (parent as View).setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                parent = parent.parent
+            }
+        }
+
         return composeView
     }
 

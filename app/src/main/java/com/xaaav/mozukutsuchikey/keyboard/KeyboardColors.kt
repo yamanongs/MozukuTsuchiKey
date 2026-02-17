@@ -2,7 +2,7 @@ package com.xaaav.mozukutsuchikey.keyboard
 
 import androidx.compose.ui.graphics.Color
 
-val KeyboardBackground = Color(0xFF1A1A1E)
+val KeyboardBackground = Color.Transparent
 val CharKeyBackground = Color(0xFF3A3A3E)
 val ActionKeyBackground = Color(0xFF2E2E34)
 val RepeatKeyBackground = Color(0xFF2E2E34)
