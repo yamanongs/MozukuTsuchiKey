@@ -399,6 +399,7 @@ fun ImeKeyboard(
                     shiftState = shiftState,
                     isListening = isListening,
                     isSpeaking = isSpeaking,
+                    isFloating = isFloating,
                     onKeyPress = { handleKeyPress(it) },
                     onToggleModifier = { toggleModifier(it) },
                 )
@@ -448,6 +449,7 @@ private fun RenderGridKey(
     shiftState: ModifierLevel,
     isListening: Boolean,
     isSpeaking: Boolean,
+    isFloating: Boolean,
     onKeyPress: (Key) -> Unit,
     onToggleModifier: (ModifierType) -> Unit,
 ) {
@@ -472,6 +474,7 @@ private fun RenderGridKey(
                 backgroundColor = if (isSpace) SpaceBarBackground else CharKeyBackground,
                 showPreview = !isSpace,
                 repeatable = true,
+                isFloating = isFloating,
             )
         }
 
@@ -483,6 +486,7 @@ private fun RenderGridKey(
             cornerRadius = dims.cornerRadius,
             backgroundColor = ActionKeyBackground,
             showPreview = false,
+            isFloating = isFloating,
         )
 
         is Key.Repeatable -> QwertyRepeatableButton(
@@ -494,6 +498,7 @@ private fun RenderGridKey(
             cornerRadius = dims.cornerRadius,
             backgroundColor = RepeatKeyBackground,
             showPreview = true,
+            isFloating = isFloating,
         )
 
         is Key.Modifier -> {
@@ -507,6 +512,7 @@ private fun RenderGridKey(
                     cornerRadius = dims.cornerRadius,
                     backgroundColor = ModifierOffBackground,
                     showPreview = false,
+                    isFloating = isFloating,
                 )
             } else {
                 val level = when (key.type) {
@@ -521,6 +527,7 @@ private fun RenderGridKey(
                     modifier = keyModifier,
                     fontSize = dims.fontSize,
                     cornerRadius = dims.cornerRadius,
+                    isFloating = isFloating,
                 )
             }
         }
@@ -536,6 +543,7 @@ private fun RenderGridKey(
                     cornerRadius = dims.cornerRadius,
                     backgroundColor = ActionKeyBackground,
                     showPreview = false,
+                    isFloating = isFloating,
                 )
             } else {
                 QwertyKeyButton(
@@ -547,6 +555,7 @@ private fun RenderGridKey(
                     backgroundColor = if (isJapaneseMode) JpModeBackground else EnModeBackground,
                     pressedBackgroundColor = if (isJapaneseMode) JpModePressedBackground else EnModePressedBackground,
                     showPreview = false,
+                    isFloating = isFloating,
                 )
             }
         }
@@ -560,6 +569,7 @@ private fun RenderGridKey(
             backgroundColor = if (symbolMode) SymbolSwitchBackground else ActionKeyBackground,
             pressedBackgroundColor = if (symbolMode) SymbolSwitchPressedBackground else KeyPressedBackground,
             showPreview = false,
+            isFloating = isFloating,
         )
 
         is Key.VoiceInput -> {
@@ -573,6 +583,7 @@ private fun RenderGridKey(
                     cornerRadius = dims.cornerRadius,
                     backgroundColor = voiceBg,
                     showPreview = false,
+                    isFloating = isFloating,
                 )
                 if (isListening && isSpeaking) {
                     VoicePulseRings(modifier = Modifier.fillMaxSize())
@@ -588,6 +599,7 @@ private fun RenderGridKey(
             cornerRadius = dims.cornerRadius,
             backgroundColor = ActionKeyBackground,
             showPreview = false,
+            isFloating = isFloating,
         )
     }
 }

@@ -21,3 +21,4 @@ val EnModePressedBackground = Color(0xFF381E1E)
 val SymbolSwitchBackground = Color(0xFF3A2A4A)
 val SymbolSwitchPressedBackground = Color(0xFF2E1E3E)
 val FloatingKeyboardBackground = Color.Transparent
+val KeyBorderColor = Color(0xFF505058)

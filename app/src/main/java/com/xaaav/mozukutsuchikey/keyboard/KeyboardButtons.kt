@@ -6,6 +6,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -55,6 +56,7 @@ fun QwertyKeyButton(
     pressedBackgroundColor: Color = KeyPressedBackground,
     showPreview: Boolean = true,
     repeatable: Boolean = false,
+    isFloating: Boolean = false,
 ) {
     if (repeatable) {
         val currentOnClick by rememberUpdatedState(onClick)
@@ -64,7 +66,12 @@ fun QwertyKeyButton(
 
         DisposableEffect(Unit) { onDispose { repeatJob?.cancel() } }
 
-        val bgColor = if (isPressed) pressedBackgroundColor else backgroundColor
+        val bgColor = when {
+            isPressed -> pressedBackgroundColor
+            isFloating -> Color.Transparent
+            else -> backgroundColor
+        }
+        val shape = RoundedCornerShape(cornerRadius)
 
         Surface(
             modifier = modifier
@@ -92,10 +99,11 @@ fun QwertyKeyButton(
                             }
                         }
                     )
-                },
-            shape = RoundedCornerShape(cornerRadius),
+                }
+                .then(if (isFloating) Modifier.border(1.dp, KeyBorderColor, shape) else Modifier),
+            shape = shape,
             color = bgColor,
-            shadowElevation = if (isPressed) 0.dp else 1.dp,
+            shadowElevation = if (isPressed || isFloating) 0.dp else 1.dp,
         ) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -124,17 +132,24 @@ fun QwertyKeyButton(
     } else {
         val interactionSource = remember { MutableInteractionSource() }
         val isPressed by interactionSource.collectIsPressedAsState()
-        val bgColor = if (isPressed) pressedBackgroundColor else backgroundColor
+        val bgColor = when {
+            isPressed -> pressedBackgroundColor
+            isFloating -> Color.Transparent
+            else -> backgroundColor
+        }
+        val shape = RoundedCornerShape(cornerRadius)
 
         Surface(
-            modifier = modifier.clickable(
-                interactionSource = interactionSource,
-                indication = null,
-                onClick = onClick,
-            ),
-            shape = RoundedCornerShape(cornerRadius),
+            modifier = modifier
+                .clickable(
+                    interactionSource = interactionSource,
+                    indication = null,
+                    onClick = onClick,
+                )
+                .then(if (isFloating) Modifier.border(1.dp, KeyBorderColor, shape) else Modifier),
+            shape = shape,
             color = bgColor,
-            shadowElevation = if (isPressed) 0.dp else 1.dp,
+            shadowElevation = if (isPressed || isFloating) 0.dp else 1.dp,
         ) {
             Box(
                 contentAlignment = Alignment.Center,
@@ -207,6 +222,7 @@ fun QwertyRepeatableButton(
     cornerRadius: Dp,
     backgroundColor: Color = CharKeyBackground,
     showPreview: Boolean = false,
+    isFloating: Boolean = false,
 ) {
     val currentOnPress by rememberUpdatedState(onPress)
     val coroutineScope = rememberCoroutineScope()
@@ -215,7 +231,12 @@ fun QwertyRepeatableButton(
 
     DisposableEffect(Unit) { onDispose { repeatJob?.cancel() } }
 
-    val bgColor = if (isPressed) KeyPressedBackground else backgroundColor
+    val bgColor = when {
+        isPressed -> KeyPressedBackground
+        isFloating -> Color.Transparent
+        else -> backgroundColor
+    }
+    val shape = RoundedCornerShape(cornerRadius)
 
     Surface(
         modifier = modifier
@@ -243,10 +264,11 @@ fun QwertyRepeatableButton(
                         }
                     }
                 )
-            },
-        shape = RoundedCornerShape(cornerRadius),
+            }
+            .then(if (isFloating) Modifier.border(1.dp, KeyBorderColor, shape) else Modifier),
+        shape = shape,
         color = bgColor,
-        shadowElevation = if (isPressed) 0.dp else 1.dp,
+        shadowElevation = if (isPressed || isFloating) 0.dp else 1.dp,
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -282,26 +304,34 @@ fun QwertyModifierButton(
     modifier: Modifier = Modifier,
     fontSize: Int,
     cornerRadius: Dp,
+    isFloating: Boolean = false,
 ) {
-    val bgColor = when (level) {
-        ModifierLevel.OFF -> ModifierOffBackground
-        ModifierLevel.TRANSIENT -> ModifierTransientBackground
-        ModifierLevel.LOCKED -> ModifierLockedBackground
+    val bgColor = when {
+        level != ModifierLevel.OFF -> when (level) {
+            ModifierLevel.TRANSIENT -> ModifierTransientBackground
+            ModifierLevel.LOCKED -> ModifierLockedBackground
+            else -> ModifierOffBackground
+        }
+        isFloating -> Color.Transparent
+        else -> ModifierOffBackground
     }
     val textColor = when (level) {
         ModifierLevel.OFF -> ModifierOffTextColor
         else -> Color.White
     }
+    val shape = RoundedCornerShape(cornerRadius)
 
     Surface(
-        modifier = modifier.clickable(
-            interactionSource = remember { MutableInteractionSource() },
-            indication = null,
-            onClick = onClick,
-        ),
-        shape = RoundedCornerShape(cornerRadius),
+        modifier = modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick,
+            )
+            .then(if (isFloating) Modifier.border(1.dp, KeyBorderColor, shape) else Modifier),
+        shape = shape,
         color = bgColor,
-        shadowElevation = 1.dp,
+        shadowElevation = if (isFloating) 0.dp else 1.dp,
     ) {
         Box(
             contentAlignment = Alignment.Center,
