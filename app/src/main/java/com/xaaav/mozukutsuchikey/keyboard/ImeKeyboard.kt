@@ -434,7 +434,7 @@ fun ImeKeyboard(
         if (composingText.isNotEmpty()) {
             ic?.setComposingText(composingText, 1)
         } else if (wasComposing) {
-            ic?.finishComposingText()
+            ic?.setComposingText("", 0)
         }
     }
 
