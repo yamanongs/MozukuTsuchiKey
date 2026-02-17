@@ -415,7 +415,7 @@ fun ImeKeyboard(
         ) {
             Surface(
                 modifier = Modifier
-                    .fillMaxWidth(0.92f)
+                    .fillMaxWidth(0.97f)
                     .onGloballyPositioned { coords ->
                         onKeyboardBoundsChanged?.invoke(coords.boundsInWindow())
                     },
