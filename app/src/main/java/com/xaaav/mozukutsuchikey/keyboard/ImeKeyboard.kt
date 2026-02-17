@@ -539,6 +539,24 @@ fun ImeKeyboard(
                 isJapaneseMode = event.mode == FlickInputMode.JAPANESE
                 if (!isJapaneseMode) mozcController.reset()
             }
+            is FlickEvent.VoiceInput -> {
+                confirmToggle()
+                if (isListening) {
+                    stopVoiceInput()
+                } else {
+                    val hasPermission = ContextCompat.checkSelfPermission(
+                        context, Manifest.permission.RECORD_AUDIO
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (hasPermission) {
+                        startListening()
+                    } else {
+                        val intent = Intent(context, PermissionActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                        context.startActivity(intent)
+                    }
+                }
+            }
         }
     }
 
@@ -612,6 +630,8 @@ fun ImeKeyboard(
                 FlickKeyboard(
                     mode = flickMode,
                     onEvent = { handleFlickEvent(it) },
+                    isListening = isListening,
+                    isSpeaking = isSpeaking,
                 )
             }
         }

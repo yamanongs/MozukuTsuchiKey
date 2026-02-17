@@ -19,6 +19,8 @@ import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.KeyboardReturn
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.SpaceBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
@@ -53,6 +55,7 @@ import com.xaaav.mozukutsuchikey.keyboard.EnterKeyBackground
 import com.xaaav.mozukutsuchikey.keyboard.KeyBorderColor
 import com.xaaav.mozukutsuchikey.keyboard.KeyPressedBackground
 import com.xaaav.mozukutsuchikey.keyboard.KeyTextColor
+import com.xaaav.mozukutsuchikey.keyboard.VoiceActiveBackground
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -68,6 +71,7 @@ sealed class FlickEvent {
     data object CursorLeft : FlickEvent()
     data object CursorRight : FlickEvent()
     data class ModeChanged(val mode: FlickInputMode) : FlickEvent()
+    data object VoiceInput : FlickEvent()
 }
 
 @Composable
@@ -75,6 +79,8 @@ fun FlickKeyboard(
     mode: FlickInputMode,
     onEvent: (FlickEvent) -> Unit,
     modifier: Modifier = Modifier,
+    isListening: Boolean = false,
+    isSpeaking: Boolean = false,
 ) {
     val flickKeys = flickKeysForMode(mode)
 
@@ -218,12 +224,12 @@ fun FlickKeyboard(
                 onFlick = { dir -> emitCharEvent(flickKeys[11], dir, onEvent) },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
-            // Second spacer / empty
+            // Voice input
             SideKeyButton(
-                label = "",
-                onClick = {},
+                icon = if (isSpeaking) Icons.Default.GraphicEq else Icons.Default.Mic,
+                onClick = { onEvent(FlickEvent.VoiceInput) },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
-                backgroundColor = Color.Transparent,
+                backgroundColor = if (isListening) VoiceActiveBackground else ActionKeyBackground,
             )
         }
     }
