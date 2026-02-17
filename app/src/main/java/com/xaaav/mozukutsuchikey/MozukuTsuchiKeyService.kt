@@ -52,6 +52,8 @@ class MozukuTsuchiKeyService : InputMethodService(),
     private val _inputActive = MutableStateFlow(true)
     val inputActive: StateFlow<Boolean> = _inputActive.asStateFlow()
 
+    var keyboardBounds: android.graphics.Rect? = null
+
     override fun onCreate() {
         super.onCreate()
         savedStateRegistryController.performRestore(null)
@@ -85,6 +87,19 @@ class MozukuTsuchiKeyService : InputMethodService(),
         super.onWindowHidden()
     }
 
+    override fun onComputeInsets(outInsets: Insets) {
+        super.onComputeInsets(outInsets)
+        val bounds = keyboardBounds
+        if (bounds != null && !bounds.isEmpty) {
+            outInsets.touchableInsets = Insets.TOUCHABLE_INSETS_REGION
+            outInsets.touchableRegion.set(bounds)
+            // Tell the app the keyboard has zero layout height so it doesn't resize,
+            // keeping the app Surface drawn behind the keyboard for transparency
+            outInsets.contentTopInsets = window?.window?.decorView?.height ?: bounds.top
+            outInsets.visibleTopInsets = bounds.top
+        }
+    }
+
     override fun onCreateInputView(): View {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
@@ -113,6 +128,14 @@ class MozukuTsuchiKeyService : InputMethodService(),
                     mozcController = mozcController,
                     clipboardHistory = clipboardHistory,
                     inputActive = inputActive,
+                    onKeyboardBoundsChanged = { rect ->
+                        keyboardBounds = android.graphics.Rect(
+                            rect.left.toInt(),
+                            rect.top.toInt(),
+                            rect.right.toInt(),
+                            rect.bottom.toInt(),
+                        )
+                    },
                 )
             }
         }

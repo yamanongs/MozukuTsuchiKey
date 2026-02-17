@@ -36,7 +36,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -60,6 +64,7 @@ fun ImeKeyboard(
     clipboardHistory: ClipboardHistory,
     inputActive: StateFlow<Boolean>,
     modifier: Modifier = Modifier,
+    onKeyboardBoundsChanged: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
 ) {
     val dims = getQwertyDimensions()
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -350,10 +355,9 @@ fun ImeKeyboard(
         }
     }
 
-    Surface(
-        modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars),
-        color = KeyboardBackground,
-    ) {
+    val isFloating = screenWidthDp > 600
+
+    val keyboardContent: @Composable () -> Unit = {
         Column {
             // Mozc candidate bar (priority over clipboard bar)
             if (mozcController.isComposing) {
@@ -399,6 +403,35 @@ fun ImeKeyboard(
                     onToggleModifier = { toggleModifier(it) },
                 )
             }
+        }
+    }
+
+    if (isFloating) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.navigationBars),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .onGloballyPositioned { coords ->
+                        onKeyboardBoundsChanged?.invoke(coords.boundsInWindow())
+                    },
+                shape = RoundedCornerShape(12.dp),
+                color = FloatingKeyboardBackground,
+                shadowElevation = 8.dp,
+            ) {
+                keyboardContent()
+            }
+        }
+    } else {
+        Surface(
+            modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars),
+            color = KeyboardBackground,
+        ) {
+            keyboardContent()
         }
     }
 }
