@@ -48,6 +48,14 @@ import androidx.core.content.ContextCompat
 import com.xaaav.mozukutsuchikey.PermissionActivity
 import com.xaaav.mozukutsuchikey.clipboard.ClipboardBar
 import com.xaaav.mozukutsuchikey.clipboard.ClipboardHistory
+import com.xaaav.mozukutsuchikey.flick.FlickDirection
+import com.xaaav.mozukutsuchikey.flick.FlickEvent
+import com.xaaav.mozukutsuchikey.flick.FlickInputMode
+import com.xaaav.mozukutsuchikey.flick.FlickKeyboard
+import com.xaaav.mozukutsuchikey.flick.getDakuten
+import com.xaaav.mozukutsuchikey.flick.getDakutenSmall
+import com.xaaav.mozukutsuchikey.flick.getHandakuten
+import com.xaaav.mozukutsuchikey.flick.getSmallChar
 import com.xaaav.mozukutsuchikey.mozc.MozcCandidateBar
 import com.xaaav.mozukutsuchikey.mozc.MozcInputController
 import kotlinx.coroutines.Job
@@ -73,6 +81,8 @@ fun ImeKeyboard(
 
     var isJapaneseMode by remember { mutableStateOf(false) }
     var symbolMode by remember { mutableStateOf(false) }
+    val useFlickKeyboard = screenWidthDp <= 600
+    var flickMode by remember { mutableStateOf(FlickInputMode.JAPANESE) }
     var showClipboard by remember { mutableStateOf(false) }
     val clipboardItems by clipboardHistory.items.collectAsStateWithLifecycle()
     var isListening by remember { mutableStateOf(false) }
@@ -358,26 +368,134 @@ fun ImeKeyboard(
     val isSplitLayout = screenWidthDp > 600
     val isFloating = true // Keys always use transparent/border style
 
-    val keyboardContent: @Composable () -> Unit = {
-        Column {
-            // Mozc candidate bar (priority over clipboard bar)
-            if (mozcController.isComposing) {
-                MozcCandidateBar(
-                    composingText = mozcController.composingText,
-                    candidates = mozcController.candidates,
-                    onCandidateSelected = { mozcController.selectCandidate(it) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            } else if (showClipboard && clipboardItems.isNotEmpty()) {
-                ClipboardBar(
-                    items = clipboardItems,
-                    onItemSelected = { text ->
-                        currentInputConnection()?.commitText(text, 1)
-                        showClipboard = false
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+    // ==================== Flick keyboard event handler ====================
+
+    fun handleFlickEvent(event: FlickEvent) {
+        when (event) {
+            is FlickEvent.CharInput -> {
+                val ch = event.char
+                if (flickMode == FlickInputMode.JAPANESE) {
+                    mozcController.ensureInitialized()
+                    mozcController.handleCodePoint(ch.code)
+                } else {
+                    currentInputConnection()?.commitText(ch.toString(), 1)
+                }
             }
+            is FlickEvent.DakutenInput -> {
+                if (flickMode == FlickInputMode.JAPANESE && mozcController.isComposing) {
+                    // Apply dakuten/handakuten/small to last char of composing text
+                    val text = mozcController.composingText
+                    if (text.isNotEmpty()) {
+                        val lastChar = text.last()
+                        val converted = when (event.direction) {
+                            FlickDirection.TAP -> lastChar.getDakutenSmall()
+                            FlickDirection.LEFT -> lastChar.getDakuten()
+                            FlickDirection.RIGHT -> lastChar.getHandakuten()
+                            FlickDirection.TOP -> lastChar.getSmallChar()
+                            FlickDirection.BOTTOM -> null
+                        }
+                        if (converted != null) {
+                            // Delete last char and re-send the converted one
+                            mozcController.handleSpecialKey(SpecialKey.BACKSPACE)
+                            mozcController.handleCodePoint(converted.code)
+                        }
+                    }
+                } else if (flickMode == FlickInputMode.ENGLISH) {
+                    // Toggle case of last committed char — handled via composing
+                    val ic = currentInputConnection() ?: return
+                    val before = ic.getTextBeforeCursor(1, 0)
+                    if (!before.isNullOrEmpty()) {
+                        val ch = before[0]
+                        val toggled = ch.getDakutenSmall()
+                        if (toggled != null) {
+                            ic.deleteSurroundingText(1, 0)
+                            ic.commitText(toggled.toString(), 1)
+                        }
+                    }
+                } else if (flickMode == FlickInputMode.NUMBER) {
+                    // Number mode dakuten key: ()[]
+                    val ch = when (event.direction) {
+                        FlickDirection.TAP -> '('
+                        FlickDirection.LEFT -> ')'
+                        FlickDirection.TOP -> '['
+                        FlickDirection.RIGHT -> ']'
+                        FlickDirection.BOTTOM -> null
+                    }
+                    if (ch != null) {
+                        currentInputConnection()?.commitText(ch.toString(), 1)
+                    }
+                }
+            }
+            is FlickEvent.Delete -> {
+                if (mozcController.isComposing) {
+                    mozcController.handleSpecialKey(SpecialKey.BACKSPACE)
+                } else {
+                    sendKeyEvent(AndroidKeyEvent.KEYCODE_DEL)
+                }
+            }
+            is FlickEvent.Enter -> {
+                if (mozcController.isComposing) {
+                    mozcController.handleSpecialKey(SpecialKey.ENTER)
+                } else {
+                    sendKeyEvent(AndroidKeyEvent.KEYCODE_ENTER)
+                }
+            }
+            is FlickEvent.Space -> {
+                if (mozcController.isComposing) {
+                    mozcController.handleSpecialKey(SpecialKey.SPACE)
+                } else {
+                    currentInputConnection()?.commitText(" ", 1)
+                }
+            }
+            is FlickEvent.CursorLeft -> {
+                if (mozcController.isComposing) {
+                    mozcController.handleSpecialKey(SpecialKey.LEFT)
+                } else {
+                    sendKeyEvent(AndroidKeyEvent.KEYCODE_DPAD_LEFT)
+                }
+            }
+            is FlickEvent.CursorRight -> {
+                if (mozcController.isComposing) {
+                    mozcController.handleSpecialKey(SpecialKey.RIGHT)
+                } else {
+                    sendKeyEvent(AndroidKeyEvent.KEYCODE_DPAD_RIGHT)
+                }
+            }
+            is FlickEvent.ModeChanged -> {
+                flickMode = event.mode
+                isJapaneseMode = event.mode == FlickInputMode.JAPANESE
+                if (!isJapaneseMode) mozcController.reset()
+            }
+        }
+    }
+
+    // ==================== Candidate bar content ====================
+
+    val candidateBarContent: @Composable () -> Unit = {
+        if (mozcController.isComposing) {
+            MozcCandidateBar(
+                composingText = mozcController.composingText,
+                candidates = mozcController.candidates,
+                onCandidateSelected = { mozcController.selectCandidate(it) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        } else if (showClipboard && clipboardItems.isNotEmpty()) {
+            ClipboardBar(
+                items = clipboardItems,
+                onItemSelected = { text ->
+                    currentInputConnection()?.commitText(text, 1)
+                    showClipboard = false
+                },
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+    }
+
+    // ==================== QWERTY keyboard content ====================
+
+    val qwertyKeyboardContent: @Composable () -> Unit = {
+        Column {
+            candidateBarContent()
 
             // Keyboard grid
             KeyboardGrid(
@@ -408,7 +526,23 @@ fun ImeKeyboard(
         }
     }
 
-    if (isSplitLayout) {
+    // ==================== Layout selection ====================
+
+    if (useFlickKeyboard) {
+        // Flick keyboard for narrow screens (≤600dp)
+        Surface(
+            modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars),
+            color = KeyboardBackground,
+        ) {
+            Column {
+                candidateBarContent()
+                FlickKeyboard(
+                    mode = flickMode,
+                    onEvent = { handleFlickEvent(it) },
+                )
+            }
+        }
+    } else if (isSplitLayout) {
         Box(
             modifier = modifier
                 .fillMaxWidth()
@@ -425,7 +559,7 @@ fun ImeKeyboard(
                 color = FloatingKeyboardBackground,
                 shadowElevation = 8.dp,
             ) {
-                keyboardContent()
+                qwertyKeyboardContent()
             }
         }
     } else {
@@ -433,7 +567,7 @@ fun ImeKeyboard(
             modifier = modifier.windowInsetsPadding(WindowInsets.navigationBars),
             color = KeyboardBackground,
         ) {
-            keyboardContent()
+            qwertyKeyboardContent()
         }
     }
 }
