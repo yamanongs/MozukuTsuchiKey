@@ -552,7 +552,9 @@ private fun RenderGridKey(
                     modifier = keyModifier,
                     fontSize = dims.fontSize,
                     cornerRadius = dims.cornerRadius,
-                    backgroundColor = if (isJapaneseMode) JpModeBackground else EnModeBackground,
+                    backgroundColor = (if (isJapaneseMode) JpModeBackground else EnModeBackground).let {
+                        if (isFloating) it.copy(alpha = 0.3f) else it
+                    },
                     pressedBackgroundColor = if (isJapaneseMode) JpModePressedBackground else EnModePressedBackground,
                     showPreview = false,
                     isFloating = isFloating,
@@ -566,14 +568,18 @@ private fun RenderGridKey(
             modifier = keyModifier,
             fontSize = dims.fontSize,
             cornerRadius = dims.cornerRadius,
-            backgroundColor = if (symbolMode) SymbolSwitchBackground else ActionKeyBackground,
+            backgroundColor = if (symbolMode) {
+                if (isFloating) SymbolSwitchBackground.copy(alpha = 0.3f) else SymbolSwitchBackground
+            } else ActionKeyBackground,
             pressedBackgroundColor = if (symbolMode) SymbolSwitchPressedBackground else KeyPressedBackground,
             showPreview = false,
             isFloating = isFloating,
         )
 
         is Key.VoiceInput -> {
-            val voiceBg = if (isListening) VoiceActiveBackground else ActionKeyBackground
+            val voiceBg = if (isListening) {
+                if (isFloating) VoiceActiveBackground.copy(alpha = 0.3f) else VoiceActiveBackground
+            } else ActionKeyBackground
             Box(modifier = keyModifier) {
                 QwertyKeyButton(
                     icon = if (isSpeaking) Icons.Default.GraphicEq else Icons.Default.Mic,

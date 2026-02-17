@@ -68,7 +68,7 @@ fun QwertyKeyButton(
 
         val bgColor = when {
             isPressed -> pressedBackgroundColor
-            isFloating -> Color.Transparent
+            isFloating && backgroundColor.alpha >= 1f -> Color.Transparent
             else -> backgroundColor
         }
         val shape = RoundedCornerShape(cornerRadius)
@@ -134,7 +134,7 @@ fun QwertyKeyButton(
         val isPressed by interactionSource.collectIsPressedAsState()
         val bgColor = when {
             isPressed -> pressedBackgroundColor
-            isFloating -> Color.Transparent
+            isFloating && backgroundColor.alpha >= 1f -> Color.Transparent
             else -> backgroundColor
         }
         val shape = RoundedCornerShape(cornerRadius)
@@ -311,7 +311,7 @@ fun QwertyModifierButton(
             ModifierLevel.TRANSIENT -> ModifierTransientBackground
             ModifierLevel.LOCKED -> ModifierLockedBackground
             else -> ModifierOffBackground
-        }
+        }.let { if (isFloating) it.copy(alpha = 0.3f) else it }
         isFloating -> Color.Transparent
         else -> ModifierOffBackground
     }
