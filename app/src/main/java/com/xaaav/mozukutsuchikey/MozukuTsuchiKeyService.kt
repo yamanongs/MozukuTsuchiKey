@@ -129,11 +129,7 @@ class MozukuTsuchiKeyService : InputMethodService(),
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
 
-        isFloatingMode = !isNarrowScreen()
-
-        if (isFloatingMode) {
-            setWindowBackground(transparent = true)
-        }
+        isFloatingMode = false
 
         // Set ViewTree owners on the IME window's decorView so all child views inherit them
         window?.window?.decorView?.let { decorView ->

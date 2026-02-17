@@ -99,7 +99,7 @@ fun ImeKeyboard(
     }
 
     val isSplitLayout = screenWidthDp > 600
-    var isFloating by remember { mutableStateOf(true) }
+    var isFloating by remember { mutableStateOf(false) }
     LaunchedEffect(isFloating, isSplitLayout) {
         if (isSplitLayout) {
             onFloatingStateChanged?.invoke(isFloating)
