@@ -143,7 +143,9 @@ val GRID_KEYS_SPLIT: List<GridKey> = listOf(
     GridKey(Key.Char('e', 'E', symbol = '='), GridPosition(130, R2_S, 36, RH_S)),
     GridKey(Key.Char('r', 'R', symbol = '+'), GridPosition(172, R2_S, 36, RH_S)),
     GridKey(Key.Char('t', 'T', symbol = '~'), GridPosition(214, R2_S, 36, RH_S)),
-    // Row 2 — Right: Y U I O P BS
+    GridKey(Key.Action("Tab", AndroidKeyEvent.KEYCODE_TAB), GridPosition(256, R2_S, 36, RH_S)),
+    // Row 2 — Right: BS Y U I O P BS
+    GridKey(Key.Repeatable("\u232B", icon = Icons.AutoMirrored.Filled.Backspace, keyCode = AndroidKeyEvent.KEYCODE_DEL), GridPosition(416, R2_S, 36, RH_S)),
     GridKey(Key.Char('y', 'Y', symbol = '|'), GridPosition(458, R2_S, 36, RH_S)),
     GridKey(Key.Char('u', 'U', symbol = '\\'), GridPosition(500, R2_S, 36, RH_S)),
     GridKey(Key.Char('i', 'I', symbol = '['), GridPosition(542, R2_S, 36, RH_S)),
@@ -158,7 +160,9 @@ val GRID_KEYS_SPLIT: List<GridKey> = listOf(
     GridKey(Key.Char('d', 'D', symbol = '\''), GridPosition(134, R3_S, 36, RH_S)),
     GridKey(Key.Char('f', 'F', symbol = '"'), GridPosition(176, R3_S, 36, RH_S)),
     GridKey(Key.Char('g', 'G', symbol = '`'), GridPosition(218, R3_S, 36, RH_S)),
-    // Row 3 — Right: H J K L ; Enter(spans rows 3-4)
+    GridKey(Key.JpToggle(), GridPosition(260, R3_S, 36, RH_S)),
+    // Row 3 — Right: Enter H J K L ; Enter(spans rows 3-4)
+    GridKey(Key.Action("\u21B5", AndroidKeyEvent.KEYCODE_ENTER), GridPosition(424, R3_S, 36, RH_S)),
     GridKey(Key.Char('h', 'H', symbolLabel = "Home", symbolKeyCode = AndroidKeyEvent.KEYCODE_MOVE_HOME), GridPosition(466, R3_S, 36, RH_S)),
     GridKey(Key.Char('j', 'J', symbolLabel = "PgDn", symbolKeyCode = AndroidKeyEvent.KEYCODE_PAGE_DOWN), GridPosition(508, R3_S, 36, RH_S)),
     GridKey(Key.Char('k', 'K', symbolLabel = "PgUp", symbolKeyCode = AndroidKeyEvent.KEYCODE_PAGE_UP), GridPosition(550, R3_S, 36, RH_S)),
