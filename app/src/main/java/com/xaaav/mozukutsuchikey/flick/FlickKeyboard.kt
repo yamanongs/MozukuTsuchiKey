@@ -60,7 +60,7 @@ import kotlin.math.abs
 
 /** Events emitted by FlickKeyboard to the parent */
 sealed class FlickEvent {
-    data class CharInput(val char: Char) : FlickEvent()
+    data class CharInput(val char: Char, val tapChar: Char? = null) : FlickEvent()
     data class DakutenInput(val direction: FlickDirection) : FlickEvent()
     data object Delete : FlickEvent()
     data object Enter : FlickEvent()
@@ -231,7 +231,8 @@ fun FlickKeyboard(
 
 private fun emitCharEvent(flickChar: FlickChar, direction: FlickDirection, onEvent: (FlickEvent) -> Unit) {
     val ch = flickChar.charForDirection(direction) ?: return
-    onEvent(FlickEvent.CharInput(ch))
+    val tapChar = if (direction == FlickDirection.TAP) flickChar.tap else null
+    onEvent(FlickEvent.CharInput(ch, tapChar))
 }
 
 // ==================== Individual Key Composables ====================

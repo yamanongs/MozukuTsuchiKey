@@ -55,6 +55,7 @@ import com.xaaav.mozukutsuchikey.flick.FlickKeyboard
 import com.xaaav.mozukutsuchikey.flick.getDakuten
 import com.xaaav.mozukutsuchikey.flick.getDakutenSmall
 import com.xaaav.mozukutsuchikey.flick.getHandakuten
+import com.xaaav.mozukutsuchikey.flick.getNextToggleChar
 import com.xaaav.mozukutsuchikey.flick.getSmallChar
 import com.xaaav.mozukutsuchikey.mozc.MozcCandidateBar
 import com.xaaav.mozukutsuchikey.mozc.MozcInputController
@@ -100,11 +101,25 @@ fun ImeKeyboard(
     val voiceScope = rememberCoroutineScope()
     var idleTimeoutJob by remember { mutableStateOf<Job?>(null) }
 
+    // Toggle cycle state for flick keyboard tap-repeat
+    var toggleTapChar by remember { mutableStateOf<Char?>(null) }
+    var toggleCurrentChar by remember { mutableStateOf<Char?>(null) }
+    var toggleConfirmJob by remember { mutableStateOf<Job?>(null) }
+    val toggleScope = rememberCoroutineScope()
+
+    fun confirmToggle() {
+        toggleConfirmJob?.cancel()
+        toggleConfirmJob = null
+        toggleTapChar = null
+        toggleCurrentChar = null
+    }
+
     var speechRecognizer by remember {
         mutableStateOf(SpeechRecognizer.createSpeechRecognizer(context))
     }
     DisposableEffect(Unit) {
         onDispose {
+            toggleConfirmJob?.cancel()
             idleTimeoutJob?.cancel()
             speechRecognizer.destroy()
         }
@@ -118,11 +133,12 @@ fun ImeKeyboard(
         isSpeaking = false
     }
 
-    // inputActive が false になったら（アプリ切替時など）マイクを停止
+    // inputActive が false になったら（アプリ切替時など）マイクを停止 + トグル確定
     LaunchedEffect(Unit) {
         inputActive.collect { active ->
-            if (!active && isListening) {
-                stopVoiceInput()
+            if (!active) {
+                confirmToggle()
+                if (isListening) stopVoiceInput()
             }
         }
     }
@@ -384,14 +400,55 @@ fun ImeKeyboard(
         when (event) {
             is FlickEvent.CharInput -> {
                 val ch = event.char
+                val tapChar = event.tapChar
+
+                if (tapChar != null && toggleTapChar == tapChar && toggleCurrentChar != null) {
+                    // Same key re-tapped: cycle to next char
+                    val nextChar = toggleCurrentChar!!.getNextToggleChar(tapChar)
+                    if (nextChar != null) {
+                        // Delete previous char and send next
+                        if (flickMode == FlickInputMode.JAPANESE) {
+                            mozcController.handleSpecialKey(SpecialKey.BACKSPACE)
+                            mozcController.handleCodePoint(nextChar.code)
+                        } else {
+                            val ic = currentInputConnection()
+                            ic?.deleteSurroundingText(1, 0)
+                            ic?.commitText(nextChar.toString(), 1)
+                        }
+                        toggleCurrentChar = nextChar
+                        // Restart auto-confirm timer
+                        toggleConfirmJob?.cancel()
+                        toggleConfirmJob = toggleScope.launch {
+                            delay(1000)
+                            confirmToggle()
+                        }
+                        return
+                    }
+                    // No next char in cycle — fall through to confirm + new char
+                }
+
+                // Confirm any pending toggle before sending new char
+                confirmToggle()
+
                 if (flickMode == FlickInputMode.JAPANESE) {
                     mozcController.ensureInitialized()
                     mozcController.handleCodePoint(ch.code)
                 } else {
                     currentInputConnection()?.commitText(ch.toString(), 1)
                 }
+
+                // Start toggle tracking if this was a tap and cycle exists
+                if (tapChar != null && ch.getNextToggleChar(tapChar) != null) {
+                    toggleTapChar = tapChar
+                    toggleCurrentChar = ch
+                    toggleConfirmJob = toggleScope.launch {
+                        delay(1000)
+                        confirmToggle()
+                    }
+                }
             }
             is FlickEvent.DakutenInput -> {
+                confirmToggle()
                 if (flickMode == FlickInputMode.JAPANESE && mozcController.isComposing) {
                     // Apply dakuten/handakuten/small to last char of composing text
                     val text = mozcController.composingText
@@ -437,6 +494,7 @@ fun ImeKeyboard(
                 }
             }
             is FlickEvent.Delete -> {
+                confirmToggle()
                 if (mozcController.isComposing) {
                     mozcController.handleSpecialKey(SpecialKey.BACKSPACE)
                 } else {
@@ -444,6 +502,7 @@ fun ImeKeyboard(
                 }
             }
             is FlickEvent.Enter -> {
+                confirmToggle()
                 if (mozcController.isComposing) {
                     mozcController.handleSpecialKey(SpecialKey.ENTER)
                 } else {
@@ -451,6 +510,7 @@ fun ImeKeyboard(
                 }
             }
             is FlickEvent.Space -> {
+                confirmToggle()
                 if (mozcController.isComposing) {
                     mozcController.handleSpecialKey(SpecialKey.SPACE)
                 } else {
@@ -458,6 +518,7 @@ fun ImeKeyboard(
                 }
             }
             is FlickEvent.CursorLeft -> {
+                confirmToggle()
                 if (mozcController.isComposing) {
                     mozcController.handleSpecialKey(SpecialKey.LEFT)
                 } else {
@@ -465,6 +526,7 @@ fun ImeKeyboard(
                 }
             }
             is FlickEvent.CursorRight -> {
+                confirmToggle()
                 if (mozcController.isComposing) {
                     mozcController.handleSpecialKey(SpecialKey.RIGHT)
                 } else {
@@ -472,6 +534,7 @@ fun ImeKeyboard(
                 }
             }
             is FlickEvent.ModeChanged -> {
+                confirmToggle()
                 flickMode = event.mode
                 isJapaneseMode = event.mode == FlickInputMode.JAPANESE
                 if (!isJapaneseMode) mozcController.reset()
