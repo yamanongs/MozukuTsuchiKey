@@ -355,7 +355,8 @@ fun ImeKeyboard(
         }
     }
 
-    val isFloating = screenWidthDp > 600
+    val isSplitLayout = screenWidthDp > 600
+    val isFloating = true // Keys always use transparent/border style
 
     val keyboardContent: @Composable () -> Unit = {
         Column {
@@ -407,7 +408,7 @@ fun ImeKeyboard(
         }
     }
 
-    if (isFloating) {
+    if (isSplitLayout) {
         Box(
             modifier = modifier
                 .fillMaxWidth()
