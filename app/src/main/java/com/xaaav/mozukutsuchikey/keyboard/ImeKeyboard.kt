@@ -263,6 +263,15 @@ fun ImeKeyboard(
         if (extracted != null) {
             val newPos = (extracted.selectionStart + offset).coerceIn(0, extracted.text.length)
             ic.setSelection(newPos, newPos)
+        } else {
+            // Terminal apps don't support getExtractedText — fall back to KeyEvent
+            val keyCode = if (offset > 0) AndroidKeyEvent.KEYCODE_DPAD_RIGHT else AndroidKeyEvent.KEYCODE_DPAD_LEFT
+            val downTime = android.os.SystemClock.uptimeMillis()
+            val flags = AndroidKeyEvent.FLAG_SOFT_KEYBOARD or AndroidKeyEvent.FLAG_KEEP_TOUCH_MODE
+            repeat(kotlin.math.abs(offset)) {
+                ic.sendKeyEvent(AndroidKeyEvent(downTime, downTime, AndroidKeyEvent.ACTION_DOWN, keyCode, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, flags))
+                ic.sendKeyEvent(AndroidKeyEvent(downTime, android.os.SystemClock.uptimeMillis(), AndroidKeyEvent.ACTION_UP, keyCode, 0, 0, KeyCharacterMap.VIRTUAL_KEYBOARD, 0, flags))
+            }
         }
         ic.endBatchEdit()
     }
