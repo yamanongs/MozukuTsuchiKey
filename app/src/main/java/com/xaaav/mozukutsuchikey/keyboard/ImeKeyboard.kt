@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -111,6 +112,9 @@ fun ImeKeyboard(
     var isSpeaking by remember { mutableStateOf(false) }
     val voiceScope = rememberCoroutineScope()
     var idleTimeoutJob by remember { mutableStateOf<Job?>(null) }
+    var readyTimeoutJob by remember { mutableStateOf<Job?>(null) }
+    var retryCount by remember { mutableIntStateOf(0) }
+    var recognizerGeneration by remember { mutableIntStateOf(0) }
 
     // Toggle cycle state for flick keyboard tap-repeat
     var toggleTapChar by remember { mutableStateOf<Char?>(null) }
@@ -132,6 +136,7 @@ fun ImeKeyboard(
         onDispose {
             toggleConfirmJob?.cancel()
             idleTimeoutJob?.cancel()
+            readyTimeoutJob?.cancel()
             speechRecognizer.destroy()
         }
     }
@@ -139,6 +144,9 @@ fun ImeKeyboard(
     fun stopVoiceInput() {
         idleTimeoutJob?.cancel()
         idleTimeoutJob = null
+        readyTimeoutJob?.cancel()
+        readyTimeoutJob = null
+        retryCount = 0
         speechRecognizer.cancel()
         isListening = false
         isSpeaking = false
@@ -162,21 +170,56 @@ fun ImeKeyboard(
         }
     }
 
-    fun startListening() {
+    val currentInputConnection by rememberUpdatedState(inputConnection)
+
+    // Holder for recognitionListener — allows recreateSpeechRecognizer (declared before
+    // recognitionListener) to set the listener immediately on the new instance.
+    val listenerHolder = remember { arrayOfNulls<RecognitionListener>(1) }
+
+    fun recreateSpeechRecognizer() {
+        speechRecognizer.cancel()
+        speechRecognizer.destroy()
+        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        listenerHolder[0]?.let { speechRecognizer.setRecognitionListener(it) }
+        recognizerGeneration++
+    }
+
+    fun startListening(restart: Boolean = false, restartDelayMs: Long = 0L) {
+        if (restart) {
+            if (!isListening) return
+            if (retryCount >= 5) {
+                Log.w("VoiceInput", "Max retries reached, stopping")
+                stopVoiceInput()
+                return
+            }
+            retryCount++
+            recreateSpeechRecognizer()
+            voiceScope.launch {
+                delay(restartDelayMs)
+                if (isListening) startListening()
+            }
+            return
+        }
+
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, 3000L)
         }
         isListening = true
+        val gen = recognizerGeneration
         speechRecognizer.startListening(intent)
-    }
 
-    val currentInputConnection by rememberUpdatedState(inputConnection)
-
-    fun recreateSpeechRecognizer() {
-        speechRecognizer.destroy()
-        speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+        readyTimeoutJob?.cancel()
+        readyTimeoutJob = voiceScope.launch {
+            delay(3_000)
+            if (isListening && gen == recognizerGeneration) {
+                Log.w("VoiceInput", "onReadyForSpeech not received, restarting")
+                startListening(restart = true, restartDelayMs = 150L)
+            }
+        }
     }
 
     val recognitionListener = remember {
@@ -187,29 +230,47 @@ fun ImeKeyboard(
                     ?.firstOrNull()
                 if (text != null) {
                     currentInputConnection()?.commitText(text, 1)
-                    resetIdleTimeout()
+                    retryCount = 0
                 }
-                if (isListening) startListening()
+                if (isListening) startListening(restart = true, restartDelayMs = 150L)
             }
             override fun onError(error: Int) {
                 Log.w("VoiceInput", "SpeechRecognizer error: $error")
-                recreateSpeechRecognizer()
-                if (isListening && (error == SpeechRecognizer.ERROR_NO_MATCH
-                            || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT)) {
-                    startListening()
-                } else {
-                    stopVoiceInput()
+                when (error) {
+                    SpeechRecognizer.ERROR_NO_MATCH,
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT ->
+                        if (isListening) startListening(restart = true, restartDelayMs = 150L)
+                        else stopVoiceInput()
+                    SpeechRecognizer.ERROR_AUDIO,
+                    SpeechRecognizer.ERROR_CLIENT,
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY,
+                    SpeechRecognizer.ERROR_SERVER,
+                    SpeechRecognizer.ERROR_NETWORK,
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT ->
+                        if (isListening) startListening(restart = true, restartDelayMs = 500L)
+                        else stopVoiceInput()
+                    else -> stopVoiceInput()
                 }
             }
             override fun onEndOfSpeech() { isSpeaking = false }
-            override fun onReadyForSpeech(params: Bundle?) { resetIdleTimeout() }
-            override fun onBeginningOfSpeech() { isSpeaking = true; resetIdleTimeout() }
+            override fun onReadyForSpeech(params: Bundle?) {
+                readyTimeoutJob?.cancel()
+                resetIdleTimeout()
+            }
+            override fun onBeginningOfSpeech() {
+                isSpeaking = true
+                retryCount = 0
+                resetIdleTimeout()
+            }
             override fun onRmsChanged(rmsdB: Float) {}
             override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onPartialResults(partialResults: Bundle?) {
+                resetIdleTimeout()
+            }
             override fun onEvent(eventType: Int, params: Bundle?) {}
         }
     }
+    listenerHolder[0] = recognitionListener
     DisposableEffect(speechRecognizer) {
         speechRecognizer.setRecognitionListener(recognitionListener)
         onDispose {}
