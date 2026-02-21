@@ -56,6 +56,7 @@ import com.xaaav.mozukutsuchikey.flick.FlickDirection
 import com.xaaav.mozukutsuchikey.flick.FlickEvent
 import com.xaaav.mozukutsuchikey.flick.FlickInputMode
 import com.xaaav.mozukutsuchikey.flick.FlickKeyboard
+import com.xaaav.mozukutsuchikey.flick.MiniQwertyKeyboard
 import com.xaaav.mozukutsuchikey.flick.getDakuten
 import com.xaaav.mozukutsuchikey.flick.getDakutenSmall
 import com.xaaav.mozukutsuchikey.flick.getHandakuten
@@ -747,12 +748,21 @@ fun ImeKeyboard(
         ) {
             Column {
                 candidateBarContent()
-                FlickKeyboard(
-                    mode = flickMode,
-                    onEvent = { handleFlickEvent(it) },
-                    isListening = isListening,
-                    isSpeaking = isSpeaking,
-                )
+                if (flickMode == FlickInputMode.JAPANESE) {
+                    FlickKeyboard(
+                        mode = flickMode,
+                        onEvent = { handleFlickEvent(it) },
+                        isListening = isListening,
+                        isSpeaking = isSpeaking,
+                    )
+                } else {
+                    MiniQwertyKeyboard(
+                        mode = flickMode,
+                        onEvent = { handleFlickEvent(it) },
+                        isListening = isListening,
+                        isSpeaking = isSpeaking,
+                    )
+                }
             }
         }
     } else if (isSplitLayout) {
