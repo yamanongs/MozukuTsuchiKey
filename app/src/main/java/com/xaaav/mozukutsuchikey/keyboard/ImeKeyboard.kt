@@ -438,7 +438,14 @@ fun ImeKeyboard(
                 } else if (key.keyCode == AndroidKeyEvent.KEYCODE_DPAD_RIGHT && !isCtrlActive && !isAltActive) {
                     moveCursor(1)
                 } else {
-                    sendKeyEvent(key.keyCode, buildMetaState())
+                    val meta = buildMetaState()
+                    val effectiveMeta = if (key.keyCode in intArrayOf(
+                            AndroidKeyEvent.KEYCODE_DPAD_UP, AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                            AndroidKeyEvent.KEYCODE_DPAD_LEFT, AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                        )) {
+                        meta and (AndroidKeyEvent.META_SHIFT_ON or AndroidKeyEvent.META_SHIFT_LEFT_ON).inv()
+                    } else meta
+                    sendKeyEvent(key.keyCode, effectiveMeta)
                 }
                 clearTransientModifiers()
             }
