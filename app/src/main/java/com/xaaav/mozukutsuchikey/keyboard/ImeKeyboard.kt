@@ -354,6 +354,9 @@ fun ImeKeyboard(
     }
 
     fun handleKeyPress(key: Key) {
+        if (isListening && key !is Key.VoiceInput) {
+            stopVoiceInput()
+        }
         when (key) {
             is Key.Char -> {
                 if (symbolMode) {
@@ -519,6 +522,9 @@ fun ImeKeyboard(
     // ==================== Flick keyboard event handler ====================
 
     fun handleFlickEvent(event: FlickEvent) {
+        if (isListening && event !is FlickEvent.VoiceInput) {
+            stopVoiceInput()
+        }
         when (event) {
             is FlickEvent.CharInput -> {
                 val ch = event.char
