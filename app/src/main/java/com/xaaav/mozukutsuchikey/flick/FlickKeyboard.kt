@@ -1,9 +1,9 @@
 package com.xaaav.mozukutsuchikey.flick
 
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
@@ -41,7 +41,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -50,16 +53,15 @@ import androidx.compose.ui.window.Popup
 import com.xaaav.mozukutsuchikey.keyboard.ActionKeyBackground
 import com.xaaav.mozukutsuchikey.keyboard.CharKeyBackground
 import com.xaaav.mozukutsuchikey.keyboard.EnModeBackground
-import com.xaaav.mozukutsuchikey.keyboard.JpModeBackground
 import com.xaaav.mozukutsuchikey.keyboard.EnterKeyBackground
-import com.xaaav.mozukutsuchikey.keyboard.KeyBorderColor
+import com.xaaav.mozukutsuchikey.keyboard.JpModeBackground
 import com.xaaav.mozukutsuchikey.keyboard.KeyPressedBackground
 import com.xaaav.mozukutsuchikey.keyboard.KeyTextColor
 import com.xaaav.mozukutsuchikey.keyboard.VoiceActiveBackground
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.abs
+import kotlin.math.sqrt
 
 /** Events emitted by FlickKeyboard to the parent */
 sealed class FlickEvent {
@@ -83,26 +85,29 @@ fun FlickKeyboard(
     isSpeaking: Boolean = false,
 ) {
     val flickKeys = flickKeysForMode(mode)
+    val configuration = LocalConfiguration.current
+    val screenHeightDp = configuration.screenHeightDp.dp
+    // Dynamic height: ~38% of screen height, clamped between 200dp and 300dp
+    val keyboardHeight = (screenHeightDp * 0.38f).coerceIn(200.dp, 300.dp)
 
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .padding(horizontal = 2.dp, vertical = 2.dp),
+            .height(keyboardHeight)
+            .padding(horizontal = 4.dp, vertical = 4.dp),
     ) {
         // 4 rows × 5 columns
-        // Row 1: [←戻] [あ] [か] [さ] [BS]
-        // Row 2: [←]  [た] [な] [は] [→]
-        // Row 3: [記号] [ま] [や] [ら] [空白]
-        // Row 4: [JP/EN] [小゛゜] [わ] [、。] [Enter]
-        val rowWeight = 1f
+        // Row 1: [←] [あ] [か] [さ] [BS]
+        // Row 2: [→] [た] [な] [は] [Space]
+        // Row 3: [mode] [ま] [や] [ら] [Enter]
+        // Row 4: [label] [小゛゜] [わ] [、。] [Voice]
 
         // Row 1
-        Row(modifier = Modifier.fillMaxWidth().weight(rowWeight)) {
+        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
             SideKeyButton(
                 icon = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                 onClick = { onEvent(FlickEvent.CursorLeft) },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(0.85f).fillMaxHeight(),
                 repeatable = true,
             )
             FlickCharKey(
@@ -123,17 +128,17 @@ fun FlickKeyboard(
             SideKeyButton(
                 icon = Icons.AutoMirrored.Filled.Backspace,
                 onClick = { onEvent(FlickEvent.Delete) },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(0.85f).fillMaxHeight(),
                 repeatable = true,
             )
         }
 
         // Row 2
-        Row(modifier = Modifier.fillMaxWidth().weight(rowWeight)) {
+        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
             SideKeyButton(
                 icon = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 onClick = { onEvent(FlickEvent.CursorRight) },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(0.85f).fillMaxHeight(),
                 repeatable = true,
             )
             FlickCharKey(
@@ -154,17 +159,16 @@ fun FlickKeyboard(
             SideKeyButton(
                 icon = Icons.Filled.SpaceBar,
                 onClick = { onEvent(FlickEvent.Space) },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(0.85f).fillMaxHeight(),
             )
         }
 
         // Row 3
-        Row(modifier = Modifier.fillMaxWidth().weight(rowWeight)) {
-            // Mode switch
+        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
             SideKeyButton(
                 label = mode.next().label,
                 onClick = { onEvent(FlickEvent.ModeChanged(mode.next())) },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(0.85f).fillMaxHeight(),
                 backgroundColor = when (mode) {
                     FlickInputMode.JAPANESE -> JpModeBackground.copy(alpha = 0.5f)
                     FlickInputMode.ENGLISH -> EnModeBackground.copy(alpha = 0.5f)
@@ -189,25 +193,23 @@ fun FlickKeyboard(
             SideKeyButton(
                 icon = Icons.AutoMirrored.Filled.KeyboardReturn,
                 onClick = { onEvent(FlickEvent.Enter) },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(0.85f).fillMaxHeight(),
                 backgroundColor = EnterKeyBackground,
             )
         }
 
         // Row 4
-        Row(modifier = Modifier.fillMaxWidth().weight(rowWeight)) {
-            // Empty spacer to align the grid
+        Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
             SideKeyButton(
                 label = mode.label,
                 onClick = { /* no-op, display only */ },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(0.85f).fillMaxHeight(),
                 backgroundColor = when (mode) {
                     FlickInputMode.JAPANESE -> JpModeBackground.copy(alpha = 0.3f)
                     FlickInputMode.ENGLISH -> EnModeBackground.copy(alpha = 0.3f)
                     FlickInputMode.NUMBER -> ActionKeyBackground
                 },
             )
-            // Dakuten key
             FlickDakutenKey(
                 label = flickKeyLabel(mode, 9),
                 onFlick = { dir -> onEvent(FlickEvent.DakutenInput(dir)) },
@@ -224,11 +226,10 @@ fun FlickKeyboard(
                 onFlick = { dir -> emitCharEvent(flickKeys[11], dir, onEvent) },
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
-            // Voice input
             SideKeyButton(
                 icon = if (isSpeaking) Icons.Default.GraphicEq else Icons.Default.Mic,
                 onClick = { onEvent(FlickEvent.VoiceInput) },
-                modifier = Modifier.weight(1f).fillMaxHeight(),
+                modifier = Modifier.weight(0.85f).fillMaxHeight(),
                 backgroundColor = if (isListening) VoiceActiveBackground else ActionKeyBackground,
             )
         }
@@ -243,8 +244,11 @@ private fun emitCharEvent(flickChar: FlickChar, direction: FlickDirection, onEve
 
 // ==================== Individual Key Composables ====================
 
-private val keyShape = RoundedCornerShape(6.dp)
-private const val FLICK_THRESHOLD_DP = 30
+private val charKeyShape = RoundedCornerShape(10.dp)
+private val sideKeyShape = RoundedCornerShape(8.dp)
+
+/** Colors for flick direction indicators on char keys */
+private val FlickHintColor = Color(0xFF707078)
 
 @Composable
 private fun FlickCharKey(
@@ -253,16 +257,16 @@ private fun FlickCharKey(
     onFlick: (FlickDirection) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val density = LocalDensity.current
-    val thresholdPx = with(density) { FLICK_THRESHOLD_DP.dp.toPx() }
     var flickDirection by remember { mutableStateOf(FlickDirection.TAP) }
     var isPressed by remember { mutableStateOf(false) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var keyWidthPx by remember { mutableStateOf(0f) }
     val currentOnFlick by rememberUpdatedState(onFlick)
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
-            .padding(1.dp)
+            .padding(2.dp)
+            .onSizeChanged { keyWidthPx = it.width.toFloat() }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -271,7 +275,6 @@ private fun FlickCharKey(
                     dragOffset = Offset.Zero
                     flickDirection = FlickDirection.TAP
 
-                    // Track drag until all pointers are up
                     while (true) {
                         val event = awaitPointerEvent()
                         val changes = event.changes
@@ -283,7 +286,8 @@ private fun FlickCharKey(
                         val delta = primary.positionChange()
                         if (delta != Offset.Zero) {
                             dragOffset += delta
-                            flickDirection = computeFlickDirection(dragOffset, thresholdPx)
+                            val threshold = (keyWidthPx / 3f).coerceAtLeast(20f)
+                            flickDirection = computeFlickDirection(dragOffset, threshold)
                             primary.consume()
                         }
                     }
@@ -296,19 +300,52 @@ private fun FlickCharKey(
             },
         contentAlignment = Alignment.Center,
     ) {
-        // Key background
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(1.dp, KeyBorderColor, keyShape),
-            shape = keyShape,
-            color = if (isPressed) KeyPressedBackground else Color.Transparent,
+            modifier = Modifier.fillMaxSize(),
+            shape = charKeyShape,
+            color = if (isPressed) KeyPressedBackground else CharKeyBackground,
+            shadowElevation = if (isPressed) 0.dp else 2.dp,
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                // Flick direction hints (small characters at edges)
+                flickChar.left?.let {
+                    Text(
+                        text = it.toString(),
+                        color = FlickHintColor,
+                        fontSize = 9.sp,
+                        modifier = Modifier.align(Alignment.CenterStart).padding(start = 3.dp),
+                    )
+                }
+                flickChar.right?.let {
+                    Text(
+                        text = it.toString(),
+                        color = FlickHintColor,
+                        fontSize = 9.sp,
+                        modifier = Modifier.align(Alignment.CenterEnd).padding(end = 3.dp),
+                    )
+                }
+                flickChar.top?.let {
+                    Text(
+                        text = it.toString(),
+                        color = FlickHintColor,
+                        fontSize = 9.sp,
+                        modifier = Modifier.align(Alignment.TopCenter).padding(top = 1.dp),
+                    )
+                }
+                flickChar.bottom?.let {
+                    Text(
+                        text = it.toString(),
+                        color = FlickHintColor,
+                        fontSize = 9.sp,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 1.dp),
+                    )
+                }
+                // Main label
                 Text(
                     text = label,
                     color = KeyTextColor,
-                    fontSize = 18.sp,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Medium,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -318,18 +355,12 @@ private fun FlickCharKey(
         if (isPressed && flickDirection != FlickDirection.TAP) {
             val previewChar = flickChar.charForDirection(flickDirection)
             if (previewChar != null) {
-                FlickPreviewPopup(
-                    char = previewChar,
-                    direction = flickDirection,
-                )
+                FlickPreviewPopup(char = previewChar, direction = flickDirection)
             }
         }
         // Tap popup (show tap char enlarged)
         if (isPressed && flickDirection == FlickDirection.TAP && flickChar.tap != null) {
-            FlickPreviewPopup(
-                char = flickChar.tap,
-                direction = FlickDirection.TAP,
-            )
+            FlickPreviewPopup(char = flickChar.tap, direction = FlickDirection.TAP)
         }
     }
 }
@@ -341,11 +372,10 @@ private fun FlickDakutenKey(
     modifier: Modifier = Modifier,
     mode: FlickInputMode,
 ) {
-    val density = LocalDensity.current
-    val thresholdPx = with(density) { FLICK_THRESHOLD_DP.dp.toPx() }
     var flickDirection by remember { mutableStateOf(FlickDirection.TAP) }
     var isPressed by remember { mutableStateOf(false) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var keyWidthPx by remember { mutableStateOf(0f) }
     val currentOnFlick by rememberUpdatedState(onFlick)
 
     val dirLabels = when (mode) {
@@ -368,7 +398,8 @@ private fun FlickDakutenKey(
 
     Box(
         modifier = modifier
-            .padding(1.dp)
+            .padding(2.dp)
+            .onSizeChanged { keyWidthPx = it.width.toFloat() }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -388,7 +419,8 @@ private fun FlickDakutenKey(
                         val delta = primary.positionChange()
                         if (delta != Offset.Zero) {
                             dragOffset += delta
-                            flickDirection = computeFlickDirection(dragOffset, thresholdPx)
+                            val threshold = (keyWidthPx / 3f).coerceAtLeast(20f)
+                            flickDirection = computeFlickDirection(dragOffset, threshold)
                             primary.consume()
                         }
                     }
@@ -402,17 +434,16 @@ private fun FlickDakutenKey(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(1.dp, KeyBorderColor, keyShape),
-            shape = keyShape,
-            color = if (isPressed) KeyPressedBackground else Color.Transparent,
+            modifier = Modifier.fillMaxSize(),
+            shape = charKeyShape,
+            color = if (isPressed) KeyPressedBackground else CharKeyBackground,
+            shadowElevation = if (isPressed) 0.dp else 2.dp,
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 Text(
                     text = label,
                     color = KeyTextColor,
-                    fontSize = 14.sp,
+                    fontSize = 15.sp,
                     textAlign = TextAlign.Center,
                 )
             }
@@ -452,7 +483,7 @@ private fun SideKeyButton(
 
     Box(
         modifier = modifier
-            .padding(1.dp)
+            .padding(2.dp)
             .pointerInput(repeatable) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
@@ -462,7 +493,7 @@ private fun SideKeyButton(
 
                     if (repeatable) {
                         repeatJob = coroutineScope.launch {
-                            delay(400) // long-press threshold
+                            delay(400)
                             didRepeat = true
                             while (true) {
                                 currentOnClick()
@@ -471,7 +502,6 @@ private fun SideKeyButton(
                         }
                     }
 
-                    // Wait for release
                     while (true) {
                         val event = awaitPointerEvent()
                         val changes = event.changes
@@ -484,7 +514,7 @@ private fun SideKeyButton(
 
                     if (repeatable) {
                         repeatJob?.cancel()
-                        if (!didRepeat) currentOnClick() // short tap: fire once
+                        if (!didRepeat) currentOnClick()
                     } else {
                         currentOnClick()
                     }
@@ -494,11 +524,10 @@ private fun SideKeyButton(
         contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .border(1.dp, KeyBorderColor, keyShape),
-            shape = keyShape,
-            color = if (isPressed) KeyPressedBackground else backgroundColor.copy(alpha = 0.15f),
+            modifier = Modifier.fillMaxSize(),
+            shape = sideKeyShape,
+            color = if (isPressed) KeyPressedBackground else backgroundColor.copy(alpha = 0.2f),
+            shadowElevation = if (isPressed) 0.dp else 1.dp,
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                 if (icon != null) {
@@ -512,7 +541,8 @@ private fun SideKeyButton(
                     Text(
                         text = label,
                         color = KeyTextColor,
-                        fontSize = 14.sp,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -531,14 +561,14 @@ private fun FlickPreviewPopup(
 ) {
     val density = LocalDensity.current
     val offsetX = when (direction) {
-        FlickDirection.LEFT -> with(density) { (-48).dp.roundToPx() }
-        FlickDirection.RIGHT -> with(density) { 48.dp.roundToPx() }
+        FlickDirection.LEFT -> with(density) { (-52).dp.roundToPx() }
+        FlickDirection.RIGHT -> with(density) { 52.dp.roundToPx() }
         else -> 0
     }
     val offsetY = when (direction) {
-        FlickDirection.TOP -> with(density) { (-56).dp.roundToPx() }
-        FlickDirection.BOTTOM -> with(density) { 56.dp.roundToPx() }
-        FlickDirection.TAP -> with(density) { (-56).dp.roundToPx() }
+        FlickDirection.TOP -> with(density) { (-60).dp.roundToPx() }
+        FlickDirection.BOTTOM -> with(density) { 60.dp.roundToPx() }
+        FlickDirection.TAP -> with(density) { (-60).dp.roundToPx() }
         else -> 0
     }
 
@@ -547,20 +577,21 @@ private fun FlickPreviewPopup(
         offset = IntOffset(offsetX, offsetY),
     ) {
         Surface(
-            shape = RoundedCornerShape(8.dp),
-            color = CharKeyBackground,
-            shadowElevation = 4.dp,
+            shape = RoundedCornerShape(12.dp),
+            color = Color(0xFF4A4A52),
+            shadowElevation = 8.dp,
         ) {
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .defaultMinSize(minWidth = 44.dp, minHeight = 44.dp)
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                    .defaultMinSize(minWidth = 48.dp, minHeight = 48.dp)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
             ) {
                 Text(
                     text = labelOverride ?: char.toString(),
                     color = Color.White,
-                    fontSize = 24.sp,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Medium,
                 )
             }
         }
@@ -569,13 +600,30 @@ private fun FlickPreviewPopup(
 
 // ==================== Helpers ====================
 
+/**
+ * Compute flick direction using dot-product of normalized offset against direction unit vectors.
+ * Inspired by FUTO Keyboard's approach for better angular accuracy.
+ */
 private fun computeFlickDirection(offset: Offset, threshold: Float): FlickDirection {
-    val absX = abs(offset.x)
-    val absY = abs(offset.y)
-    if (absX < threshold && absY < threshold) return FlickDirection.TAP
-    return if (absX > absY) {
-        if (offset.x < 0) FlickDirection.LEFT else FlickDirection.RIGHT
-    } else {
-        if (offset.y < 0) FlickDirection.TOP else FlickDirection.BOTTOM
+    val length = sqrt(offset.x * offset.x + offset.y * offset.y)
+    if (length < threshold) return FlickDirection.TAP
+
+    // Normalize the offset vector
+    val dirX = offset.x / length
+    val dirY = offset.y / length
+
+    // Dot product against each cardinal direction unit vector, pick the highest
+    // LEFT=(-1,0), RIGHT=(1,0), TOP=(0,-1), BOTTOM=(0,1)
+    val dotLeft = -dirX   // dot with (-1, 0)
+    val dotRight = dirX   // dot with (1, 0)
+    val dotTop = -dirY    // dot with (0, -1)
+    val dotBottom = dirY  // dot with (0, 1)
+
+    val max = maxOf(dotLeft, dotRight, dotTop, dotBottom)
+    return when (max) {
+        dotLeft -> FlickDirection.LEFT
+        dotRight -> FlickDirection.RIGHT
+        dotTop -> FlickDirection.TOP
+        else -> FlickDirection.BOTTOM
     }
 }
