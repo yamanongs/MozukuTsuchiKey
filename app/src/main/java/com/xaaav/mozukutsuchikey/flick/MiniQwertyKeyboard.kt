@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,10 +52,13 @@ import com.xaaav.mozukutsuchikey.keyboard.JpModeBackground
 import com.xaaav.mozukutsuchikey.keyboard.KeyPressedBackground
 import com.xaaav.mozukutsuchikey.keyboard.KeyTextColor
 import com.xaaav.mozukutsuchikey.keyboard.ModifierLockedBackground
+import com.xaaav.mozukutsuchikey.keyboard.ModifierTransientBackground
 import com.xaaav.mozukutsuchikey.keyboard.VoiceActiveBackground
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+
+private enum class MiniShiftState { OFF, ONE_SHOT, LOCKED }
 
 /**
  * Compact QWERTY keyboard for narrow screens (≤600dp).
@@ -73,18 +77,20 @@ fun MiniQwertyKeyboard(
     val keyboardHeight = (screenHeightDp * 0.38f).coerceIn(200.dp, 300.dp)
 
     // Internal state for shift and symbol pages
-    var isShifted by remember { mutableStateOf(false) }
+    var shiftMode by remember { mutableStateOf(MiniShiftState.OFF) }
     var symbolPage by remember { mutableIntStateOf(0) } // 0=english, 1=symbol1, 2=symbol2
 
     // When mode changes externally, reset internal state
-    val isSymbolMode = mode == FlickInputMode.NUMBER
-    if (!isSymbolMode) {
-        symbolPage = 0
-    } else if (symbolPage == 0) {
-        symbolPage = 1
+    LaunchedEffect(mode) {
+        if (mode != FlickInputMode.NUMBER) {
+            symbolPage = 0
+        } else if (symbolPage == 0) {
+            symbolPage = 1
+        }
+        shiftMode = MiniShiftState.OFF
     }
 
-    val currentPage = if (isSymbolMode) symbolPage else 0
+    val currentPage = if (mode == FlickInputMode.NUMBER) symbolPage else 0
 
     Column(
         modifier = modifier
@@ -94,9 +100,21 @@ fun MiniQwertyKeyboard(
     ) {
         when (currentPage) {
             0 -> EnglishLayout(
-                isShifted = isShifted,
-                onChar = { ch -> onEvent(FlickEvent.CharInput(ch)) },
-                onShift = { isShifted = !isShifted },
+                isShifted = shiftMode != MiniShiftState.OFF,
+                isShiftLocked = shiftMode == MiniShiftState.LOCKED,
+                onChar = { ch ->
+                    onEvent(FlickEvent.CharInput(ch))
+                    if (shiftMode == MiniShiftState.ONE_SHOT) {
+                        shiftMode = MiniShiftState.OFF
+                    }
+                },
+                onShift = {
+                    shiftMode = when (shiftMode) {
+                        MiniShiftState.OFF -> MiniShiftState.ONE_SHOT
+                        MiniShiftState.ONE_SHOT -> MiniShiftState.LOCKED
+                        MiniShiftState.LOCKED -> MiniShiftState.OFF
+                    }
+                },
                 onDelete = { onEvent(FlickEvent.Delete) },
                 onModeToJapanese = { onEvent(FlickEvent.ModeChanged(FlickInputMode.JAPANESE)) },
                 onModeToSymbol = { onEvent(FlickEvent.ModeChanged(FlickInputMode.NUMBER)) },
@@ -139,6 +157,7 @@ fun MiniQwertyKeyboard(
 @Composable
 private fun ColumnScope.EnglishLayout(
     isShifted: Boolean,
+    isShiftLocked: Boolean,
     onChar: (Char) -> Unit,
     onShift: () -> Unit,
     onDelete: () -> Unit,
@@ -186,7 +205,11 @@ private fun ColumnScope.EnglishLayout(
             icon = Icons.Default.KeyboardArrowUp,
             onClick = onShift,
             modifier = Modifier.weight(1.5f).fillMaxHeight(),
-            backgroundColor = if (isShifted) ModifierLockedBackground else ActionKeyBackground,
+            backgroundColor = when {
+                isShiftLocked -> ModifierLockedBackground
+                isShifted -> ModifierTransientBackground
+                else -> ActionKeyBackground
+            },
         )
         for (ch in row3) {
             val display = if (isShifted) ch.uppercaseChar() else ch
@@ -212,6 +235,7 @@ private fun ColumnScope.EnglishLayout(
         secondLabel = "?123",
         onSecond = onModeToSymbol,
         onSpace = onSpace,
+        onComma = { onChar(',') },
         onPeriod = { onChar('.') },
         onVoice = onVoice,
         onEnter = onEnter,
@@ -293,6 +317,7 @@ private fun ColumnScope.Symbol1Layout(
         secondLabel = "ABC",
         onSecond = onModeToEnglish,
         onSpace = onSpace,
+        onComma = { onChar(',') },
         onPeriod = { onChar('.') },
         onVoice = onVoice,
         onEnter = onEnter,
@@ -374,6 +399,7 @@ private fun ColumnScope.Symbol2Layout(
         secondLabel = "ABC",
         onSecond = onModeToEnglish,
         onSpace = onSpace,
+        onComma = { onChar(',') },
         onPeriod = { onChar('.') },
         onVoice = onVoice,
         onEnter = onEnter,
@@ -392,6 +418,7 @@ private fun ColumnScope.BottomRow(
     secondLabel: String,
     onSecond: () -> Unit,
     onSpace: () -> Unit,
+    onComma: () -> Unit,
     onPeriod: () -> Unit,
     onVoice: () -> Unit,
     onEnter: () -> Unit,
@@ -418,8 +445,14 @@ private fun ColumnScope.BottomRow(
         MiniActionKey(
             icon = Icons.Filled.SpaceBar,
             onClick = onSpace,
-            modifier = Modifier.weight(3.6f).fillMaxHeight(),
+            modifier = Modifier.weight(2.6f).fillMaxHeight(),
             backgroundColor = CharKeyBackground,
+        )
+        // [,]
+        MiniCharKey(
+            label = ",",
+            onClick = onComma,
+            modifier = Modifier.weight(1f).fillMaxHeight(),
         )
         // [.]
         MiniCharKey(
@@ -504,7 +537,7 @@ private fun MiniActionKey(
     icon: ImageVector? = null,
     label: String? = null,
     onClick: () -> Unit,
-    backgroundColor: Color = ActionKeyBackground,
+    backgroundColor: Color = ActionKeyBackground.copy(alpha = 0.2f),
     repeatable: Boolean = false,
 ) {
     val currentOnClick by rememberUpdatedState(onClick)
@@ -560,7 +593,7 @@ private fun MiniActionKey(
         Surface(
             modifier = Modifier.fillMaxSize(),
             shape = miniActionKeyShape,
-            color = if (isPressed) KeyPressedBackground else backgroundColor.copy(alpha = 0.3f),
+            color = if (isPressed) KeyPressedBackground else backgroundColor,
             shadowElevation = if (isPressed) 0.dp else 1.dp,
         ) {
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
