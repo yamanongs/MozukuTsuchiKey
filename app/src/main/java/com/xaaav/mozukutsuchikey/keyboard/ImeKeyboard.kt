@@ -405,6 +405,9 @@ fun ImeKeyboard(
             }
 
             is Key.Action -> {
+                if (key.keyCode == AndroidKeyEvent.KEYCODE_ENTER) {
+                    shiftState = ModifierLevel.OFF
+                }
                 if (isJapaneseMode && routeToMozc(key)) {
                     // consumed by Mozc
                 } else {
@@ -420,6 +423,12 @@ fun ImeKeyboard(
             }
 
             is Key.Repeatable -> {
+                if (key.keyCode in intArrayOf(
+                        AndroidKeyEvent.KEYCODE_DPAD_UP, AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT, AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+                    )) {
+                    shiftState = ModifierLevel.OFF
+                }
                 if (isJapaneseMode && routeToMozc(key)) {
                     // consumed by Mozc
                 } else if (key.keyCode == AndroidKeyEvent.KEYCODE_DEL && !isCtrlActive && !isAltActive) {
