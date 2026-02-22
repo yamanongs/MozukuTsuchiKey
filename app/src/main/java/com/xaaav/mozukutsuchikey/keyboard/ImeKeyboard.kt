@@ -143,14 +143,16 @@ fun ImeKeyboard(
     }
 
     fun stopVoiceInput() {
+        // Set isListening = false BEFORE cancel() so that async callbacks
+        // (onResults/onError) won't restart listening via startListening(restart=true).
+        isListening = false
+        isSpeaking = false
         idleTimeoutJob?.cancel()
         idleTimeoutJob = null
         readyTimeoutJob?.cancel()
         readyTimeoutJob = null
         retryCount = 0
         speechRecognizer.cancel()
-        isListening = false
-        isSpeaking = false
     }
 
     // inputActive が false になったら（アプリ切替時など）マイクを停止 + トグル確定
